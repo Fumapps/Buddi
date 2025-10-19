@@ -1,3 +1,29 @@
+# Build artifacts
 bin/
 build/
+dist/
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+!gradlew
+!gradlew.bat
+
+# IDE
+.classpath
+.project
+.settings/
+*.iml
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
 etc/ant.properties

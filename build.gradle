@@ -1,0 +1,220 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+// Read version from version.txt
+def versionFile = file('version.txt')
+def properties = new Properties()
+properties.load(new FileInputStream(versionFile))
+String projectVersion = properties.getProperty('VERSION')
+
+group = 'org.homeunix.thecave'
+version = projectVersion
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
+
+description = 'Buddi - Personal budget software for the rest of us'
+
+application {
+    mainClass = 'org.homeunix.thecave.buddi.Buddi'
+    applicationName = 'Buddi'
+}
+
+repositories {
+    flatDir {
+        dirs 'lib'
+    }
+}
+
+// Dependencies from lib directory
+dependencies {
+    // Swing-related dependencies
+    implementation name: 'swingx-core-1.6.2'
+    implementation name: 'jfreechart-1.0.13'
+    implementation name: 'jcommon-1.0.17'
+    implementation name: 'SwingWorker'
+    
+    // MOSS framework dependencies
+    implementation name: 'moss-application-2.1.0.0'
+    implementation name: 'moss-collections-2.1.0.0'
+    implementation name: 'moss-common-2.1.0.0'
+    implementation name: 'moss-crypto-2.1.0.0'
+    implementation name: 'moss-i18n-2.1.0.2'
+    implementation name: 'moss-swing-2.1.0.5'
+    implementation name: 'moss-osx-2.0.1.1'
+    
+    // Utility dependencies
+    implementation name: 'org.json-2.0'
+    
+    // Quaqua L&F for OSX (not included as a JAR, but handled separately)
+    // implementation name: 'quaqua-8.0'
+}
+
+// Compile configuration with all classpath entries
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+    doFirst {
+        classpath += fileTree(dir: 'lib', include: '*.jar')
+    }
+}
+
+// Custom jar task that creates a fat jar (includes all dependencies)
+jar {
+    manifest {
+        attributes(
+            'Main-Class': application.mainClass,
+            'Implementation-Title': description,
+            'Implementation-Version': version,
+            'Created-By': 'Gradle',
+            'Build-Date': new Date().format('yyyy-MM-dd HH:mm:ss')
+        )
+    }
+
+    // Include all dependency classes and resources
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+
+    // Include application resources from etc directory
+    from('etc') {
+        include 'Languages/**'
+        include 'css/**'
+    }
+
+    // Include version, images, and documentation
+    from('.') {
+        include 'version.txt'
+    }
+
+    from('img') {
+        include '*.jpg'
+        include '*.png'
+        include '*.gif'
+    }
+
+    from('docs') {
+        include '**/*.rtf'
+        include '**/*.txt'
+        include 'Licenses/**'
+    }
+
+    // Exclude Quaqua native libraries and OSX-specific files
+    exclude 'libquaqua*'
+    exclude '**/META-INF/maven/**'
+    exclude '**/META-INF/services/**'
+}
+
+// Run configuration with special VM options for legacy compatibility
+run {
+    args = []
+    systemProperties = [
+        'os.name': 'Linux',  // Override for Quaqua compatibility on modern Java
+    ]
+    jvmArgs = [
+        '--lnf', 'none',     // Disable Look and Feel on Java 23+
+        '-Xmx512m'
+    ]
+}
+
+// Source set configuration
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+    }
+    test {
+        java {
+            srcDirs = ['junit']
+        }
+    }
+}
+
+// Custom tasks for running tests from junit directory
+task runViewModelTests {
+    dependsOn 'testClasses'
+    doLast {
+        javaexec {
+            classpath = sourceSets.test.runtimeClasspath + sourceSets.main.runtimeClasspath + files('lib')
+            main = 'org.homeunix.thecave.buddi.test.viewmodel.MyAccountsViewModelTest'
+            systemProperty 'os.name', 'Linux'
+            jvmArgs = ['--lnf', 'none']
+        }
+    }
+}
+
+// Platform-specific package tasks
+task packageWindows {
+    dependsOn 'jar'
+    group = 'Build Distributions'
+    description = 'Creates Windows installer'
+    doLast {
+        println "Windows packaging would require Launch4J and IzPack"
+        println "Jar artifact created at: build/libs/Buddi-${version}.jar"
+    }
+}
+
+task packageOSX {
+    dependsOn 'jar'
+    group = 'Build Distributions'
+    description = 'Creates OSX .dmg package'
+    doLast {
+        println "OSX packaging would require JarBundler"
+        println "Jar artifact created at: build/libs/Buddi-${version}.jar"
+    }
+}
+
+task packageLinuxDebian {
+    dependsOn 'jar'
+    group = 'Build Distributions'
+    description = 'Creates Debian .deb package'
+    doLast {
+        println "Debian packaging would require jdeb plugin"
+        println "Jar artifact created at: build/libs/Buddi-${version}.jar"
+    }
+}
+
+task packageLinuxGeneric {
+    dependsOn 'jar'
+    group = 'Build Distributions'
+    description = 'Creates generic Linux package'
+    doLast {
+        println "Generic Linux package created"
+        println "Jar artifact created at: build/libs/Buddi-${version}.jar"
+    }
+}
+
+// Documentation tasks
+task printProjectInfo {
+    group = 'Help'
+    description = 'Prints project information'
+    doLast {
+        println """
+        ========================================
+        Buddi Build Information
+        ========================================
+        Project Name: ${project.name}
+        Version: ${version}
+        Group: ${group}
+        Source Compatibility: ${sourceCompatibility}
+        Target Compatibility: ${targetCompatibility}
+        Main Class: ${application.mainClass}
+        
+        Available Gradle Tasks:
+        - gradle build           : Build the project
+        - gradle jar             : Create executable jar
+        - gradle run             : Run the application
+        - gradle clean           : Clean build artifacts
+        - gradle runViewModelTests : Run ViewModel tests
+        
+        Platform-Specific Packaging:
+        - gradle packageWindows  : Windows executable (requires Launch4J)
+        - gradle packageOSX      : OSX .dmg package (requires JarBundler)
+        - gradle packageLinuxDebian : Debian .deb package (requires jdeb)
+        - gradle packageLinuxGeneric : Generic Linux .tgz package
+        
+        ========================================
+        """.stripIndent()
+    }
+}
