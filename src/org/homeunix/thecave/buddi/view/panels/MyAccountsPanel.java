@@ -1,5 +1,6 @@
 /*
  * Created on Jul 30, 2007 by wyatt
+ * Refactored to use MVVM pattern via MyAccountsViewModel.
  */
 package org.homeunix.thecave.buddi.view.panels;
 
@@ -9,6 +10,8 @@ import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -35,13 +38,12 @@ import org.homeunix.thecave.buddi.view.MainFrame;
 import org.homeunix.thecave.buddi.view.menu.items.EditEditTransactions;
 import org.homeunix.thecave.buddi.view.swing.MyAccountTableAmountCellRenderer;
 import org.homeunix.thecave.buddi.view.swing.MyAccountTreeNameCellRenderer;
+import org.homeunix.thecave.buddi.viewmodel.MyAccountsViewModel;
 import org.jdesktop.swingx.JXTreeTable;
 import org.jdesktop.swingx.decorator.HighlighterFactory;
 import org.jdesktop.swingx.table.ColumnFactory;
 import org.jdesktop.swingx.table.TableColumnExt;
 
-import ca.digitalcave.moss.application.document.DocumentChangeEvent;
-import ca.digitalcave.moss.application.document.DocumentChangeListener;
 import ca.digitalcave.moss.common.OperatingSystemUtil;
 import ca.digitalcave.moss.swing.MossPanel;
 
@@ -52,19 +54,26 @@ public class MyAccountsPanel extends MossPanel {
 	private final JLabel balanceLabel;
 
 	private final MyAccountTreeTableModel treeTableModel;
+	private final MyAccountsViewModel viewModel;
 
 	private final MainFrame parent;
 
-	private final DocumentChangeListener listener;
+	private final PropertyChangeListener viewModelListener;
 
 	public MyAccountsPanel(MainFrame parent) {
 		super(true);
 		this.parent = parent;
 		this.treeTableModel = new MyAccountTreeTableModel((Document) parent.getDocument());
+		this.viewModel = new MyAccountsViewModel((Document) parent.getDocument());
 
-		listener = new DocumentChangeListener(){
-			public void documentChange(DocumentChangeEvent event) {
-				updateContent();
+		viewModelListener = new PropertyChangeListener() {
+			@Override
+			public void propertyChange(PropertyChangeEvent evt) {
+				if (MyAccountsViewModel.PROPERTY_NET_WORTH_TEXT.equals(evt.getPropertyName())) {
+					updateNetWorthLabel();
+				} else if (MyAccountsViewModel.PROPERTY_ACCOUNT_TREE_CHANGED.equals(evt.getPropertyName())) {
+					updateTreeExpansionStates();
+				}
 			}
 		};
 
@@ -103,25 +112,27 @@ public class MyAccountsPanel extends MossPanel {
 	}
 
 	public List<Account> getSelectedAccounts(){
-		List<Account> accounts = new LinkedList<Account>();
-
-		for (Integer i : tree.getSelectedRows()) {
-			if (tree.getModel().getValueAt(i, -1) instanceof Account)
-				accounts.add((Account) tree.getModel().getValueAt(i, -1));
-		}
-
-		return accounts;
+		return viewModel.getSelectedAccounts(tree.getSelectedRows() != null ? 
+			convertRowIndicesToValues(tree.getSelectedRows()) : null);
 	}
 
 	public List<AccountType> getSelectedTypes(){
-		List<AccountType> types = new LinkedList<AccountType>();
+		return viewModel.getSelectedAccountTypes(tree.getSelectedRows() != null ? 
+			convertRowIndicesToValues(tree.getSelectedRows()) : null);
+	}
 
-		for (Integer i : tree.getSelectedRows()) {
-			if (tree.getModel().getValueAt(i, -1) instanceof AccountType)
-				types.add((AccountType) tree.getModel().getValueAt(i, -1));
+	/**
+	 * Convert tree row indices to their corresponding values (Account or AccountType objects).
+	 */
+	private Object[] convertRowIndicesToValues(int[] rowIndices) {
+		if (rowIndices == null || rowIndices.length == 0) {
+			return new Object[0];
 		}
-
-		return types;
+		Object[] values = new Object[rowIndices.length];
+		for (int i = 0; i < rowIndices.length; i++) {
+			values[i] = tree.getModel().getValueAt(rowIndices[i], -1);
+		}
+		return values;
 	}
 
 	public void actionPerformed(ActionEvent e) {
@@ -137,19 +148,14 @@ public class MyAccountsPanel extends MossPanel {
 		tree.setClosedIcon(null);
 		tree.setOpenIcon(null);
 		tree.setLeafIcon(null);
-//		tree.setColumnSelectionAllowed(false);
 		tree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
 		tree.setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
 		tree.addHighlighter(HighlighterFactory.createAlternateStriping(Const.COLOR_EVEN_ROW, Const.COLOR_ODD_ROW));
 
-//		int treeColumnWidth = 30;
-//		tree.getColumn(0).setMaxWidth(treeColumnWidth);
-//		tree.getColumn(0).setMinWidth(treeColumnWidth);
-//		tree.getColumn(0).setPreferredWidth(treeColumnWidth);
-
 		tree.setTreeCellRenderer(new MyAccountTreeNameCellRenderer());
 
-		parent.getDocument().addDocumentChangeListener(listener);
+		// Subscribe to ViewModel changes
+		viewModel.addPropertyChangeListener(viewModelListener);
 
 		JScrollPane listScroller = new JScrollPane(tree);
 
@@ -168,14 +174,6 @@ public class MyAccountsPanel extends MossPanel {
 		if (OperatingSystemUtil.isMac()){
 			listScroller.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
 		}
-
-//		tree.addMouseListener(new MouseAdapter(){
-//		@Override
-//		public void mouseClicked(MouseEvent e) {
-//		// TODO Auto-generated method stub
-//		super.mouseClicked(e);
-//		}
-//		});
 
 		tree.addTreeSelectionListener(new TreeSelectionListener(){
 			public void valueChanged(TreeSelectionEvent arg0) {
@@ -196,49 +194,52 @@ public class MyAccountsPanel extends MossPanel {
 				Object o = event.getPath().getPath()[event.getPath().getPath().length - 1];
 				if (o instanceof AccountType){
 					AccountType t = (AccountType) o;
-					t.setExpanded(false);
+					viewModel.setAccountTypeExpanded(t, false);
 				}
 			}
 			public void treeExpanded(TreeExpansionEvent event) {
 				Object o = event.getPath().getPath()[event.getPath().getPath().length - 1];
 				if (o instanceof AccountType){
 					AccountType t = (AccountType) o;
-					t.setExpanded(true);
+					viewModel.setAccountTypeExpanded(t, true);
 				}				
 			}
 		});
 
 		updateButtons();
 
-//		this.setJMenuBar(new AccountFrameMenuBar(this));
 		this.setLayout(new BorderLayout());
 		this.add(mainPanel, BorderLayout.CENTER);
 	}
 
-	public void updateContent() {
-		super.updateContent();
+	/**
+	 * Update the net worth label from the ViewModel.
+	 * Called when the ViewModel's net worth property changes.
+	 */
+	private void updateNetWorthLabel() {
+		balanceLabel.setText(viewModel.getNetWorthText());
+	}
 
-		//Fire a change event on the table model.
-//		treeTableModel.fireStructureChanged();
-
-		//Restore the state of the expanded / unrolled nodes.
-		for (AccountType t : ((Document) parent.getDocument()).getAccountTypes()) {
+	/**
+	 * Update tree expansion states from the ViewModel.
+	 * Called when the ViewModel's tree structure changes.
+	 */
+	private void updateTreeExpansionStates() {
+		// Restore the state of the expanded / unrolled nodes.
+		for (AccountType t : viewModel.getAccountTypes()) {
 			TreePath path = new TreePath(new Object[]{treeTableModel.getRoot(), t});
 			if (t.isExpanded())
 				tree.expandPath(path);
 			else
 				tree.collapsePath(path);
 		}
-
-		long netWorth = ((Document) parent.getDocument()).getNetWorth(null);
-		balanceLabel.setText(TextFormatter.getHtmlWrapper(
-				PrefsModel.getInstance().getTranslator().get(BuddiKeys.NET_WORTH) 
-				+ ": " 
-				+ TextFormatter.getFormattedCurrency(netWorth)));
-
 		tree.invalidate();
 	}
 
+	/**
+	 * Called by MainFrame to trigger a refresh of the tree structure.
+	 * Notifies the underlying tree table model to fire a structure change event.
+	 */
 	public void fireStructureChanged(){
 		treeTableModel.fireStructureChanged();
 	}
