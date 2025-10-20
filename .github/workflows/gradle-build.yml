@@ -32,7 +32,7 @@ jobs:
       run: ./gradlew clean build -x test
     
     - name: Upload JAR artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: buddi-jar-java${{ matrix.java-version }}
         path: build/libs/*.jar
@@ -44,7 +44,7 @@ jobs:
     
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: test-results-java${{ matrix.java-version }}
         path: build/reports/
@@ -77,7 +77,7 @@ jobs:
       run: ./gradlew clean build -x test
     
     - name: Upload JAR artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: buddi-jar-${{ matrix.os }}-java${{ matrix.java-version }}
         path: build/libs/*.jar
