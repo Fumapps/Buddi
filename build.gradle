@@ -11,8 +11,8 @@ String projectVersion = properties.getProperty('VERSION')
 
 group = 'org.homeunix.thecave'
 version = projectVersion
-sourceCompatibility = '1.8'
-targetCompatibility = '1.8'
+sourceCompatibility = '11'
+targetCompatibility = '11'
 
 description = 'Buddi - Personal budget software for the rest of us'
 
@@ -58,6 +58,8 @@ dependencies {
 // Compile configuration with all classpath entries
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
+    // Suppress all lint warnings for legacy code (pre-dates modern Java practices)
+    options.compilerArgs << '-Xlint:none'
     doFirst {
         classpath += fileTree(dir: 'lib', include: '*.jar')
     }
