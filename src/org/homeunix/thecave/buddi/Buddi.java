@@ -705,11 +705,12 @@ public class Buddi {
 
 		//Early on, we need to catch any open requests from Apple Launchd.
 		if (OperatingSystemUtil.isMac()){
-			Application application = Application.getApplication();
-			application.addAboutMenuItem();
-			application.addPreferencesMenuItem();
-			application.setEnabledAboutMenu(true);
-			application.setEnabledPreferencesMenu(true);
+			try {
+				Application application = Application.getApplication();
+				application.addAboutMenuItem();
+				application.addPreferencesMenuItem();
+				application.setEnabledAboutMenu(true);
+				application.setEnabledPreferencesMenu(true);
 			application.addApplicationListener(new ApplicationAdapter(){
 				@Override
 				public void handleAbout(ApplicationEvent arg0) {
@@ -758,6 +759,10 @@ public class Buddi {
 					new FileQuit(null).doClick();
 				}
 			});
+			} catch (Throwable e) {
+				// Handle incompatibility with modern Java versions where some macOS APIs have changed
+				Logger.getLogger(Buddi.class.getName()).log(Level.WARNING, "macOS integration failed (may be due to Java version incompatibility)", e);
+			}
 		}
 
 		//Set up the logging system.  If we have specified --log, we first

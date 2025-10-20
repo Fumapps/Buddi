@@ -22,6 +22,7 @@ application {
 }
 
 repositories {
+    mavenCentral()
     flatDir {
         dirs 'lib'
     }
@@ -46,6 +47,9 @@ dependencies {
     
     // Utility dependencies
     implementation name: 'org.json-2.0'
+    
+    // Test dependencies
+    testImplementation 'junit:junit:4.13.2'
     
     // Quaqua L&F for OSX (not included as a JAR, but handled separately)
     // implementation name: 'quaqua-8.0'
@@ -109,10 +113,10 @@ jar {
 run {
     args = []
     systemProperties = [
-        'os.name': 'Linux',  // Override for Quaqua compatibility on modern Java
+        'os.name': System.getProperty('os.name'),  // Use actual OS
     ]
     jvmArgs = [
-        '--lnf', 'none',     // Disable Look and Feel on Java 23+
+        '--add-opens', 'java.desktop/com.apple.eawt=ALL-UNNAMED',
         '-Xmx512m'
     ]
 }
@@ -138,8 +142,7 @@ task runViewModelTests {
         javaexec {
             classpath = sourceSets.test.runtimeClasspath + sourceSets.main.runtimeClasspath + files('lib')
             main = 'org.homeunix.thecave.buddi.test.viewmodel.MyAccountsViewModelTest'
-            systemProperty 'os.name', 'Linux'
-            jvmArgs = ['--lnf', 'none']
+            systemProperty 'os.name', System.getProperty('os.name')
         }
     }
 }
