@@ -80,12 +80,6 @@ jar {
         configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
     }
 
-    // Include application resources from etc directory
-    from('etc') {
-        include 'Languages/**'
-        include 'css/**'
-    }
-
     // Include version, images, and documentation
     from('.') {
         include 'version.txt'
@@ -107,6 +101,7 @@ jar {
     exclude 'libquaqua*'
     exclude '**/META-INF/maven/**'
     exclude '**/META-INF/services/**'
+    duplicatesStrategy 'exclude'  // Ignore duplicates (etc resources already included via sourceSets)
 }
 
 // Run configuration with special VM options for legacy compatibility
