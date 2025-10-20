@@ -112,6 +112,7 @@ jar {
 // Run configuration with special VM options for legacy compatibility
 run {
     args = []
+    workingDir = projectDir  // Run from project root to find etc/Languages/ and other resources
     systemProperties = [
         'os.name': System.getProperty('os.name'),  // Use actual OS
     ]
@@ -126,6 +127,9 @@ sourceSets {
     main {
         java {
             srcDirs = ['src']
+        }
+        resources {
+            srcDirs = ['etc']  // Include etc directory (contains Languages, css, etc.)
         }
     }
     test {
