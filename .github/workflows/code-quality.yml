@@ -9,41 +9,14 @@ on:
     - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM UTC
 
 jobs:
-  checkstyle:
+  quality-and-tests:
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Set up Java
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-    
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-    
-    - name: Check code formatting
-      run: ./gradlew check || true
-    
-    - name: Upload reports
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: code-quality-reports
-        path: build/reports/
-        retention-days: 7
-
-  test:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Java
+    - name: Set up Java 17
       uses: actions/setup-java@v3
       with:
         java-version: '17'
@@ -52,6 +25,9 @@ jobs:
     
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
+    
+    - name: Check code formatting
+      run: ./gradlew check || true
     
     - name: Run tests
       run: ./gradlew test
@@ -63,31 +39,11 @@ jobs:
         name: test-reports
         path: build/reports/tests/
         retention-days: 7
-
-  dependency-check:
-    runs-on: ubuntu-latest
     
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Java
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: gradle
-    
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-    
-    - name: Check dependencies
-      run: ./gradlew dependencyReport || true
-    
-    - name: Upload dependency report
+    - name: Upload quality reports
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: dependency-reports
+        name: code-quality-reports
         path: build/reports/
         retention-days: 7
