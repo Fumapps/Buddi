@@ -24,8 +24,11 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
     
+    - name: Check code formatting
+      run: ./gradlew check || true
+    
     - name: Build with Gradle
-      run: ./gradlew clean build -x test
+      run: ./gradlew clean build
     
     - name: Upload JAR artifact
       uses: actions/upload-artifact@v4
@@ -33,10 +36,6 @@ jobs:
         name: buddi-jar
         path: build/libs/*.jar
         retention-days: 30
-    
-    - name: Run tests
-      run: ./gradlew test
-      continue-on-error: true
     
     - name: Upload test results
       if: always()
