@@ -76,15 +76,18 @@ public class MyBudgetViewModel extends ObservableViewModel {
 		}
 		Date normalized = getSelectedBudgetPeriodType().getStartOfBudgetPeriod(date);
 		Date current = treeTableModel.getSelectedDate();
-		if (current != null && current.equals(normalized)) {
-			periodDateMap.put(periodKey(getSelectedBudgetPeriodType()), normalized);
-			return;
+		
+		boolean dateChanged = current == null || !current.equals(normalized);
+		
+		if (dateChanged) {
+			treeTableModel.setSelectedDate(normalized);
+			firePropertyChange(PROPERTY_SELECTED_DATE_CHANGED, current, normalized);
 		}
-
-		treeTableModel.setSelectedDate(normalized);
+		
 		periodDateMap.put(periodKey(getSelectedBudgetPeriodType()), normalized);
-
-		firePropertyChange(PROPERTY_SELECTED_DATE_CHANGED, current, normalized);
+		
+		// Always refresh tree and net income, even if date didn't change,
+		// because underlying transaction data may have changed
 		notifyTreeStructureChanged();
 		updateNetIncomeText();
 	}

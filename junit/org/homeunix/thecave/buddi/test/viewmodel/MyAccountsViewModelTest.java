@@ -5,6 +5,7 @@ package org.homeunix.thecave.buddi.test.viewmodel;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,6 +26,12 @@ public class MyAccountsViewModelTest {
 
 	@Before
 	public void setUp() throws ModelException {
+		// Delete autosave file before each test to prevent dialog
+		File autosaveFile = ModelFactory.getAutoSaveLocation(null);
+		if (autosaveFile.exists()) {
+			autosaveFile.delete();
+		}
+		
 		document = ModelFactory.createDocument();
 		viewModel = new MyAccountsViewModel(document);
 	}

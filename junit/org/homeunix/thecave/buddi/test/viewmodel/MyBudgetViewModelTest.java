@@ -3,6 +3,7 @@
  */
 package org.homeunix.thecave.buddi.test.viewmodel;
 
+import java.io.File;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -26,6 +27,12 @@ public class MyBudgetViewModelTest {
 
 	@Before
 	public void setUp() throws ModelException {
+		// Delete autosave file before each test to prevent dialog
+		File autosaveFile = ModelFactory.getAutoSaveLocation(null);
+		if (autosaveFile.exists()) {
+			autosaveFile.delete();
+		}
+		
 		document = ModelFactory.createDocument();
 		viewModel = new MyBudgetViewModel(document);
 	}
