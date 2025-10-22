@@ -13,11 +13,10 @@ import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
@@ -39,7 +38,6 @@ import org.homeunix.thecave.buddi.i18n.keys.BudgetCategoryTypes;
 import org.homeunix.thecave.buddi.model.BudgetCategory;
 import org.homeunix.thecave.buddi.model.BudgetCategoryType;
 import org.homeunix.thecave.buddi.model.Document;
-import org.homeunix.thecave.buddi.model.impl.FilteredLists;
 import org.homeunix.thecave.buddi.model.impl.ModelFactory;
 import org.homeunix.thecave.buddi.model.prefs.PrefsModel;
 import org.homeunix.thecave.buddi.model.swing.BudgetDateSpinnerModel;
@@ -52,6 +50,7 @@ import org.homeunix.thecave.buddi.view.swing.MyBudgetTableAmountCellEditor;
 import org.homeunix.thecave.buddi.view.swing.MyBudgetTableAmountCellRenderer;
 import org.homeunix.thecave.buddi.view.swing.MyBudgetTreeNameCellRenderer;
 import org.homeunix.thecave.buddi.view.swing.TranslatorListCellRenderer;
+import org.homeunix.thecave.buddi.viewmodel.MyBudgetViewModel;
 import org.jdesktop.swingx.JXTreeTable;
 import org.jdesktop.swingx.decorator.HighlighterFactory;
 import org.jdesktop.swingx.table.ColumnFactory;
@@ -72,15 +71,44 @@ public class MyBudgetPanel extends MossPanel implements ActionListener {
 	private final JComboBox periodTypeComboBox;
 
 	private final MyBudgetTreeTableModel treeTableModel;
-	
-	private final Map<BudgetCategoryType, Date> periodDateMap = new HashMap<BudgetCategoryType, Date>();
+	private final MyBudgetViewModel viewModel;
 
 	private final MainFrame parent;
+
+	private final PropertyChangeListener viewModelListener;
+	private boolean suppressSpinnerChange;
+	private boolean suppressPeriodTypeChange;
 
 	public MyBudgetPanel(MainFrame parent) {
 		super(true);
 		this.parent = parent;
-		this.treeTableModel = new MyBudgetTreeTableModel((Document) parent.getDocument());
+		this.viewModel = new MyBudgetViewModel((Document) parent.getDocument());
+		this.treeTableModel = viewModel.getTreeTableModel();
+		this.viewModelListener = new PropertyChangeListener() {
+			@Override
+			public void propertyChange(PropertyChangeEvent event) {
+				String property = event.getPropertyName();
+				if (MyBudgetViewModel.PROPERTY_NET_INCOME_TEXT.equals(property)) {
+					updateNetIncomeLabel();
+				}
+				else if (MyBudgetViewModel.PROPERTY_TREE_STRUCTURE_CHANGED.equals(property)) {
+					updateTreePresentation();
+				}
+				else if (MyBudgetViewModel.PROPERTY_SELECTED_DATE_CHANGED.equals(property)) {
+					Object newValue = event.getNewValue();
+					if (newValue instanceof Date) {
+						updateDateSpinnerFromViewModel((Date) newValue);
+					}
+				}
+				else if (MyBudgetViewModel.PROPERTY_PERIOD_TYPE_CHANGED.equals(property)) {
+					Object newValue = event.getNewValue();
+					if (newValue instanceof BudgetCategoryType) {
+						updatePeriodTypeCombo((BudgetCategoryType) newValue);
+						updateDateSpinnerEditor();
+					}
+				}
+			}
+		};
 		tree = new JXTreeTable(){
 			public static final long serialVersionUID = 0;
 			@Override
@@ -124,36 +152,105 @@ public class MyBudgetPanel extends MossPanel implements ActionListener {
 	}
 
 	public List<BudgetCategory> getSelectedBudgetCategories(){
-		List<BudgetCategory> budgetCategories = new LinkedList<BudgetCategory>();
-
-		for (Integer i : tree.getSelectedRows()) {
-			budgetCategories.add((BudgetCategory) tree.getModel().getValueAt(i, -1));
-		}
-
-		return budgetCategories;
+		int[] selectedRows = tree.getSelectedRows();
+		return viewModel.getSelectedBudgetCategories(selectedRows != null ? convertRowIndicesToValues(selectedRows) : null);
 	}
 	
 	public void setNextPeriod(){
-		dateSpinner.setValue(dateSpinnerModel.getNextValue());
+		Object nextValue = dateSpinnerModel.getNextValue();
+		if (nextValue instanceof Date) {
+			setSpinnerDate((Date) nextValue, true);
+		}
 	}
 	
 	public void setPreviousPeriod(){
-		dateSpinner.setValue(dateSpinnerModel.getPreviousValue());
+		Object previousValue = dateSpinnerModel.getPreviousValue();
+		if (previousValue instanceof Date) {
+			setSpinnerDate((Date) previousValue, true);
+		}
 	}
 
 	public void actionPerformed(ActionEvent e) {
 		if (e.getSource().equals(periodTypeComboBox)){
-			periodDateMap.put(treeTableModel.getSelectedBudgetPeriodType(), (Date) dateSpinnerModel.getValue());
-			if (periodTypeComboBox != null && periodTypeComboBox.getSelectedItem() != null)
-				treeTableModel.setSelectedBudgetPeriodType(ModelFactory.getBudgetCategoryType(periodTypeComboBox.getSelectedItem().toString()));
-			
-			if (periodDateMap.get(treeTableModel.getSelectedBudgetPeriodType()) == null)
-				dateSpinnerModel.setValue(treeTableModel.getSelectedBudgetPeriodType().getStartOfBudgetPeriod(dateSpinnerModel.getDate()));
+			if (!suppressPeriodTypeChange && periodTypeComboBox != null && periodTypeComboBox.getSelectedItem() != null) {
+				BudgetCategoryType newType = ModelFactory.getBudgetCategoryType(periodTypeComboBox.getSelectedItem().toString());
+				viewModel.setSelectedBudgetPeriodType(newType);
+			}
+		}
+	}
+
+	private Object[] convertRowIndicesToValues(int[] rowIndices) {
+		if (rowIndices == null || rowIndices.length == 0) {
+			return new Object[0];
+		}
+		Object[] values = new Object[rowIndices.length];
+		for (int i = 0; i < rowIndices.length; i++) {
+			values[i] = tree.getModel().getValueAt(rowIndices[i], -1);
+		}
+		return values;
+	}
+
+	private void setSpinnerDate(Date date, boolean notifyViewModel) {
+		if (date == null) {
+			return;
+		}
+		suppressSpinnerChange = true;
+		try {
+			dateSpinner.setValue(date);
+		}
+		finally {
+			suppressSpinnerChange = false;
+		}
+		if (notifyViewModel) {
+			viewModel.setSelectedDate(date);
+		}
+	}
+
+	private void updateDateSpinnerFromViewModel(Date date) {
+		setSpinnerDate(date, false);
+	}
+
+	private void updateNetIncomeLabel() {
+		balanceLabel.setText(viewModel.getNetIncomeText());
+	}
+
+	private void updateTreePresentation() {
+		for (BudgetCategory bc : viewModel.getBudgetCategories()) {
+			TreePath path = new TreePath(new Object[]{treeTableModel.getRoot(), bc});
+			if (bc.isExpanded())
+				tree.expandPath(path);
 			else
-				dateSpinnerModel.setValue(periodDateMap.get(treeTableModel.getSelectedBudgetPeriodType()));
-			this.fireStructureChanged();
-			this.updateContent();
-			parent.updateMenus();
+				tree.collapsePath(path);
+		}
+		tree.invalidate();
+		tree.repaint();
+		parent.updateMenus();
+	}
+
+	private void updatePeriodTypeCombo(BudgetCategoryType periodType) {
+		if (periodType == null) {
+			return;
+		}
+		suppressPeriodTypeChange = true;
+		try {
+			for (int i = 0; i < periodTypeComboBox.getItemCount(); i++) {
+				BudgetCategoryTypes item = (BudgetCategoryTypes) periodTypeComboBox.getItemAt(i);
+				BudgetCategoryType candidate = ModelFactory.getBudgetCategoryType(item.toString());
+				if (candidate != null && candidate.equals(periodType)) {
+					periodTypeComboBox.setSelectedItem(item);
+					break;
+				}
+			}
+		}
+		finally {
+			suppressPeriodTypeChange = false;
+		}
+	}
+
+	private void updateDateSpinnerEditor() {
+		BudgetCategoryType periodType = viewModel.getSelectedBudgetPeriodType();
+		if (periodType != null) {
+			dateSpinner.setEditor(new JSpinner.DateEditor(dateSpinner, periodType.getDateFormat()));
 		}
 	}
 
@@ -226,20 +323,20 @@ public class MyBudgetPanel extends MossPanel implements ActionListener {
 //		tree.setSelectionMode(TreeSelectionModel.DISCONTIGUOUS_TREE_SELECTION);
 		tree.addHighlighter(HighlighterFactory.createAlternateStriping(Const.COLOR_EVEN_ROW, Const.COLOR_ODD_ROW));
 
+		viewModel.addPropertyChangeListener(viewModelListener);
+
 		tree.addTreeExpansionListener(new TreeExpansionListener(){
 			public void treeCollapsed(TreeExpansionEvent event) {
 				Object o = event.getPath().getPath()[event.getPath().getPath().length - 1];
 				if (o instanceof BudgetCategory){
-					BudgetCategory bc = (BudgetCategory) o;
-					bc.setExpanded(false);
+					viewModel.setBudgetCategoryExpanded((BudgetCategory) o, false);
 				}
 			}
 			public void treeExpanded(TreeExpansionEvent event) {
 				Object o = event.getPath().getPath()[event.getPath().getPath().length - 1];
 				if (o instanceof BudgetCategory){
-					BudgetCategory bc = (BudgetCategory) o;
-					bc.setExpanded(true);
-				}				
+					viewModel.setBudgetCategoryExpanded((BudgetCategory) o, true);
+				}
 			}
 		});
 		
@@ -258,15 +355,17 @@ public class MyBudgetPanel extends MossPanel implements ActionListener {
 		dateSpinner.setPreferredSize(InternalFormatter.getComponentSize(dateSpinner, 120));
 		dateSpinner.addChangeListener(new ChangeListener(){
 			public void stateChanged(ChangeEvent arg0) {
-				if (dateSpinner.getValue() instanceof Date)
-					treeTableModel.setSelectedDate((Date) dateSpinner.getValue());
-				fireStructureChanged();
-				updateContent();
+				if (suppressSpinnerChange) {
+					return;
+				}
+				Object value = dateSpinner.getValue();
+				if (value instanceof Date) {
+					viewModel.setSelectedDate((Date) value);
+				}
 			}
 		});
 
 //		periodTypeComboBox.setPreferredSize(dateSpinner.getPreferredSize());
-		periodTypeComboBox.setSelectedItem(ModelFactory.getBudgetCategoryType(BudgetCategoryTypes.BUDGET_CATEGORY_TYPE_MONTH));
 		periodTypeComboBox.addActionListener(this);
 		periodTypeComboBox.setRenderer(new TranslatorListCellRenderer());
 
@@ -309,6 +408,11 @@ public class MyBudgetPanel extends MossPanel implements ActionListener {
 		});
 
 		updateButtons();
+		updatePeriodTypeCombo(viewModel.getSelectedBudgetPeriodType());
+		updateDateSpinnerEditor();
+		updateDateSpinnerFromViewModel(viewModel.getSelectedDate());
+		updateNetIncomeLabel();
+		updateTreePresentation();
 
 //		String dataFile = model.getFile() == null ? "" : " - " + model.getFile();
 //		this.setTitle(PrefsModel.getInstance().getTranslator().get(BuddiKeys.MY_BUDGET) + dataFile + " - " + PrefsModel.getInstance().getTranslator().get(BuddiKeys.BUDDI));
@@ -320,48 +424,14 @@ public class MyBudgetPanel extends MossPanel implements ActionListener {
 
 	public void updateContent() {
 		super.updateContent();
-
-//		int rowSelected = tree.getSelectedRow();
-//		int columnSelected = tree.getSelectedColumn();
-		
-		//Refresh the column headers.  For some stupid reason you have
-		// to do it manually, even though the model itself updates and 
-		// fires a change event.
-		for (int i = 1; i < treeTableModel.getColumnCount(); i++)
+		viewModel.refresh();
+		for (int i = 1; i < treeTableModel.getColumnCount(); i++) {
 			tree.getColumn(i).setHeaderValue(treeTableModel.getColumnName(i));
-
-		//Update the date spinner
-		dateSpinner.setEditor(new JSpinner.DateEditor(dateSpinner, treeTableModel.getSelectedBudgetPeriodType().getDateFormat()));
-
-		//Fire a change event on the table model.
-//		treeTableModel.fireStructureChanged();
-
-		//Update the balance label
-		long budgetedNetIncome = 0;
-		//We make a new linked list containing all of the filtered list to avoid the potential of a concurrent
-		// modification exception.
-		for (BudgetCategory bc : new LinkedList<BudgetCategory>(new FilteredLists.BudgetCategoryListFilteredByPeriodType(
-				(Document) parent.getDocument(), 
-				treeTableModel.getSelectedBudgetPeriodType()))) {
-			budgetedNetIncome += (bc.getAmount(treeTableModel.getSelectedDate()) * (bc.isIncome() ? 1 : -1));
 		}
-		balanceLabel.setText(TextFormatter.getHtmlWrapper(TextFormatter.getFormattedCurrency(budgetedNetIncome)));
-
-		//Restore the state of the expanded / unrolled nodes.
-		for (BudgetCategory bc : ((Document) parent.getDocument()).getBudgetCategories()) {
-			TreePath path = new TreePath(new Object[]{treeTableModel.getRoot(), bc});
-			if (bc.isExpanded())
-				tree.expandPath(path);
-			else
-				tree.collapsePath(path);
-		}
-		
-		//Re-select the last cell
-//		System.out.println(rowSelected + " - " + columnSelected);
-//		tree.changeSelection(rowSelected, columnSelected, false, false);
-		
-		//Update the menus (especially to get correct Copy From / To dates)
-		parent.updateMenus();
+		updateDateSpinnerEditor();
+		updateDateSpinnerFromViewModel(viewModel.getSelectedDate());
+		updateNetIncomeLabel();
+		updateTreePresentation();
 	}
 	
 	public MyBudgetTreeTableModel getTreeTableModel(){
@@ -369,6 +439,6 @@ public class MyBudgetPanel extends MossPanel implements ActionListener {
 	}
 	
 	public void fireStructureChanged(){
-		treeTableModel.fireStructureChanged();
+		viewModel.refresh();
 	}
 }
