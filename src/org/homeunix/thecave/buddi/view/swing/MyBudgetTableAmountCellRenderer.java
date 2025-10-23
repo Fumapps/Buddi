@@ -27,48 +27,68 @@ public class MyBudgetTableAmountCellRenderer extends DefaultTableCellRenderer {
 
 			if (sb.length() > 0)
 				sb.delete(0, sb.length());
-			
 
-			if ((Long) values[1] == 0 && (Long) values[2] == 0){
-				//To make the table easier to read, we don't include $0.00 in it; we use --- instead.
-				sb.append("---");
+			BudgetCategory category = (BudgetCategory) values[0];
+			long budgetAmount = (Long) values[1];
+			long childTotal = (Long) values[2];
+			int depth = (Integer) values[3];
+			long actual = (Long) values[4];
+			long actualIncludingSubs = (Long) values[5];
+
+			boolean hasBudgetValue = budgetAmount != 0 || childTotal != 0;
+			boolean hasActualValue = actual != 0 || actualIncludingSubs != 0;
+			boolean showCurrentBudget = PrefsModel.getInstance().isShowCurrentBudget();
+
+			if (!hasBudgetValue) {
+				if (hasActualValue && !showCurrentBudget) {
+					TextFormatter.appendFormattedCurrency(sb, actual, actual < 0,
+						InternalFormatter.isRed(category, actual));
+					if (actualIncludingSubs != actual) {
+						sb.append(" (");
+						TextFormatter.appendFormattedCurrency(sb, actualIncludingSubs, actualIncludingSubs < 0,
+							InternalFormatter.isRed(category, actualIncludingSubs));
+						sb.append(")");
+					}
+				}
+				else {
+					//To make the table easier to read, we don't include $0.00 in it; we use --- instead.
+					sb.append("---");
+				}
 			}
 			else {
 				//Display the amount for this budget category
-				TextFormatter.appendFormattedCurrency(sb, (Long) values[1], 
-						InternalFormatter.isRed((BudgetCategory) values[0], (Long) values[1]), false);
+				TextFormatter.appendFormattedCurrency(sb, budgetAmount, 
+					InternalFormatter.isRed(category, budgetAmount), false);
 				
 				//If there is anything in sub categories, add it in brackets.
-				if (!((Long) values[2]).equals((Long) values[1]) && (Long) values[2] != 0){
+				if (childTotal != budgetAmount && childTotal != 0){
 					sb.append(" (");
 					TextFormatter.appendFormattedCurrency(sb,
-							(Long) values[2], 
-							InternalFormatter.isRed((BudgetCategory) values[0], (Long) values[2]),
-							false);
+						childTotal, 
+						InternalFormatter.isRed(category, childTotal),
+						false);
 					sb.append(")");
 				}
 			}
 
-			if (PrefsModel.getInstance().isShowCurrentBudget()){
+			if (showCurrentBudget && hasBudgetValue){
 				sb.append(" / ");
-				final Long actual = (Long) values[4];
 				if(actual != 0) {
 					TextFormatter.appendFormattedCurrency(sb, actual, actual < 0, actual < 0);
 				} else {
 					sb.append("---");
 				}
 
-				final Long actualIncludingSubs = (Long) values[5];
-				if(actualIncludingSubs != (long)actual) {
+				if(actualIncludingSubs != actual) {
 					sb.append(" (");
 					TextFormatter.appendFormattedCurrency(sb, actualIncludingSubs, actualIncludingSubs < 0,
-							actualIncludingSubs < 0);
+						actualIncludingSubs < 0);
 					sb.append(")");
 				}
+			}
 
-				for (int i = 0; i < ((Integer) values[3]); i++){
-					sb.insert(0, "&nbsp&nbsp&nbsp "); 
-				}
+			for (int i = 0; i < depth; i++){
+				sb.insert(0, "&nbsp&nbsp&nbsp "); 
 			}
 			
 			sb.insert(0, "<html>");

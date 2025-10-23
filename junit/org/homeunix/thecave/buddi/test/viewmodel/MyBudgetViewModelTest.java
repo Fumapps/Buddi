@@ -179,6 +179,42 @@ public class MyBudgetViewModelTest {
 	}
 
 	@Test
+	public void testSetSelectedDateRefreshesValuesWithTransactions() throws ModelException {
+		BudgetCategory category = null;
+		for (BudgetCategory bc : document.getBudgetCategories()) {
+			if (!bc.isIncome()) {
+				category = bc;
+				break;
+			}
+		}
+		assertNotNull("Should have at least one expense budget category", category);
+
+		Date periodDate = DateUtil.getDate(2025, Calendar.SEPTEMBER, 10);
+		viewModel.setSelectedDate(periodDate);
+
+		MyBudgetTreeTableModel treeModel = viewModel.getTreeTableModel();
+		int currentMonthColumn = 2;
+		Object before = treeModel.getValueAt(category, currentMonthColumn);
+		assertNotNull(before);
+		assertTrue(before instanceof Object[]);
+		assertEquals("Expected no actual amount before transaction", 0L, ((Long) ((Object[]) before)[4]).longValue());
+
+		Account account = ModelFactory.createAccount("Verification Account", document.getAccountTypes().get(0));
+		document.addAccount(account);
+		Transaction transaction = ModelFactory.createTransaction(periodDate, "Verification expense", 2500, account, category);
+		document.addTransaction(transaction);
+
+		// Setting the same date again should cause the view model to refresh values
+		viewModel.setSelectedDate(periodDate);
+
+		Object after = treeModel.getValueAt(category, currentMonthColumn);
+		assertNotNull(after);
+		assertTrue(after instanceof Object[]);
+		Long actual = (Long) ((Object[]) after)[4];
+		assertEquals("Actual should reflect newly added transaction", -2500L, actual.longValue());
+	}
+
+	@Test
 	public void testRefreshUpdatesTreeStructure() throws ModelException {
 		MyBudgetTreeTableModel treeModel = viewModel.getTreeTableModel();
 		
