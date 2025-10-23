@@ -13,6 +13,8 @@ import java.util.Map;
 import org.homeunix.thecave.buddi.model.BudgetCategory;
 import org.homeunix.thecave.buddi.model.BudgetCategoryType;
 import org.homeunix.thecave.buddi.model.Document;
+import org.homeunix.thecave.buddi.model.Transaction;
+import org.homeunix.thecave.buddi.model.TransactionSplit;
 import org.homeunix.thecave.buddi.model.impl.FilteredLists;
 import org.homeunix.thecave.buddi.model.swing.MyBudgetTreeTableModel;
 import org.homeunix.thecave.buddi.plugin.api.util.TextFormatter;
@@ -49,9 +51,6 @@ public class MyBudgetViewModel extends ObservableViewModel {
 		};
 
 		this.document.addDocumentChangeListener(this.documentListener);
-
-		// Initialise state so getters return meaningful values before listeners attach.
-		refresh();
 	}
 
 	public MyBudgetTreeTableModel getTreeTableModel() {
@@ -164,8 +163,10 @@ public class MyBudgetViewModel extends ObservableViewModel {
 
 	private void updateNetIncomeText() {
 		String previous = netIncomeText;
-		long netIncome = calculateBudgetedNetIncome();
-		String formatted = TextFormatter.getHtmlWrapper(TextFormatter.getFormattedCurrency(netIncome));
+		long budgetedNet = calculateBudgetedNetIncome();
+		long actualNet = calculateActualNetIncome();
+		long displayNet = budgetedNet != 0 ? budgetedNet : actualNet;
+		String formatted = TextFormatter.getHtmlWrapper(TextFormatter.getFormattedCurrency(displayNet));
 		netIncomeText = formatted;
 		if (previous == null || !previous.equals(formatted)) {
 			firePropertyChange(PROPERTY_NET_INCOME_TEXT, previous, formatted);
@@ -187,6 +188,51 @@ public class MyBudgetViewModel extends ObservableViewModel {
 			total += category.isIncome() ? amount : -amount;
 		}
 		return total;
+	}
+
+	private long calculateActualNetIncome() {
+		BudgetCategoryType periodType = getSelectedBudgetPeriodType();
+		Date startDate = getSelectedDate();
+		if (periodType == null || startDate == null) {
+			return 0;
+		}
+
+		Date endDate = periodType.getEndOfBudgetPeriod(startDate);
+		long total = 0;
+		List<BudgetCategory> categories = new LinkedList<BudgetCategory>(
+				new FilteredLists.BudgetCategoryListFilteredByPeriodType(document, periodType));
+		for (BudgetCategory category : categories) {
+			long actual = calculateActualForCategory(category, startDate, endDate);
+			total += actual;
+		}
+		return total;
+	}
+
+	private long calculateActualForCategory(BudgetCategory category, Date startDate, Date endDate) {
+		List<Transaction> transactions = document.getTransactions(category, startDate, endDate);
+		long actual = 0;
+		for (Transaction transaction : transactions) {
+			if (transaction.isDeleted()) {
+				continue;
+			}
+			if (transaction.getTo() instanceof BudgetCategory) {
+				actual -= transaction.getAmount();
+			}
+			else if (transaction.getFrom() instanceof BudgetCategory) {
+				actual += transaction.getAmount();
+			}
+			for (TransactionSplit split : transaction.getToSplits()) {
+				if (split.getSource().getFullName().equals(category.getFullName())) {
+					actual -= split.getAmount();
+				}
+			}
+			for (TransactionSplit split : transaction.getFromSplits()) {
+				if (split.getSource().getFullName().equals(category.getFullName())) {
+					actual += split.getAmount();
+				}
+			}
+		}
+		return actual;
 	}
 
 	private String periodKey(BudgetCategoryType type) {

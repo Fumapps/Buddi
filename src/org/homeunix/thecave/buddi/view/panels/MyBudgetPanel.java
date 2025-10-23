@@ -211,7 +211,8 @@ public class MyBudgetPanel extends MossPanel implements ActionListener {
 	}
 
 	private void updateNetIncomeLabel() {
-		balanceLabel.setText(viewModel.getNetIncomeText());
+		String netIncome = viewModel.getNetIncomeText();
+		balanceLabel.setText(netIncome != null ? netIncome : "");
 	}
 
 	private void updateTreePresentation() {
@@ -324,6 +325,9 @@ public class MyBudgetPanel extends MossPanel implements ActionListener {
 		tree.addHighlighter(HighlighterFactory.createAlternateStriping(Const.COLOR_EVEN_ROW, Const.COLOR_ODD_ROW));
 
 		viewModel.addPropertyChangeListener(viewModelListener);
+		
+		// Trigger initial refresh after listener is registered to ensure UI gets populated
+		viewModel.refresh();
 
 		tree.addTreeExpansionListener(new TreeExpansionListener(){
 			public void treeCollapsed(TreeExpansionEvent event) {
@@ -411,7 +415,6 @@ public class MyBudgetPanel extends MossPanel implements ActionListener {
 		updatePeriodTypeCombo(viewModel.getSelectedBudgetPeriodType());
 		updateDateSpinnerEditor();
 		updateDateSpinnerFromViewModel(viewModel.getSelectedDate());
-		updateNetIncomeLabel();
 		updateTreePresentation();
 
 //		String dataFile = model.getFile() == null ? "" : " - " + model.getFile();

@@ -17,6 +17,7 @@ import org.homeunix.thecave.buddi.model.Transaction;
 import org.homeunix.thecave.buddi.model.impl.ModelFactory;
 import org.homeunix.thecave.buddi.model.swing.MyBudgetTreeTableModel;
 import org.homeunix.thecave.buddi.plugin.api.exception.ModelException;
+import org.homeunix.thecave.buddi.plugin.api.util.TextFormatter;
 import org.homeunix.thecave.buddi.viewmodel.MyBudgetViewModel;
 import org.junit.After;
 import org.junit.Before;
@@ -50,8 +51,12 @@ public class MyBudgetViewModelTest {
 	@Test
 	public void testInitialStateProvidesValues() {
 		assertNotNull("Tree table model should be available", viewModel.getTreeTableModel());
+		
+		// Trigger refresh to populate net income (mimics what the view does after listener registration)
+		viewModel.refresh();
+		
 		String netIncomeText = viewModel.getNetIncomeText();
-		assertNotNull("Net income text should not be null", netIncomeText);
+		assertNotNull("Net income text should not be null after refresh", netIncomeText);
 		assertTrue("Net income text should include HTML wrapper", netIncomeText.contains("<html>"));
 	}
 
@@ -225,6 +230,63 @@ public class MyBudgetViewModelTest {
 		
 		int afterRefreshCount = treeModel.getChildCount(treeModel.getRoot());
 		assertEquals("Child count should remain the same after refresh", initialChildCount, afterRefreshCount);
+	}
+
+	@Test
+	public void testNetIncomeTextReflectsBudgetAmounts() throws ModelException {
+		Date budgetDate = DateUtil.getDate(2025, Calendar.OCTOBER, 1);
+		viewModel.setSelectedDate(budgetDate);
+
+		BudgetCategory incomeCategory = null;
+		BudgetCategory expenseCategory = null;
+		for (BudgetCategory bc : document.getBudgetCategories()) {
+			if (bc.isIncome() && incomeCategory == null) {
+				incomeCategory = bc;
+			}
+			else if (!bc.isIncome() && expenseCategory == null) {
+				expenseCategory = bc;
+			}
+			if (incomeCategory != null && expenseCategory != null) {
+				break;
+			}
+		}
+		assertNotNull("Income category should be available", incomeCategory);
+		assertNotNull("Expense category should be available", expenseCategory);
+
+		incomeCategory.setAmount(budgetDate, 20000L);
+		expenseCategory.setAmount(budgetDate, 5000L);
+
+		viewModel.refresh();
+
+		String netIncomeText = viewModel.getNetIncomeText();
+		String expected = TextFormatter.getHtmlWrapper(TextFormatter.getFormattedCurrency(15000L));
+		assertEquals("Net income text should reflect budgeted income minus expenses", expected, netIncomeText);
+	}
+
+	@Test
+	public void testNetIncomeTextFallsBackToActualWhenBudgetsZero() throws ModelException {
+		Date budgetDate = DateUtil.getDate(2025, Calendar.NOVEMBER, 1);
+		viewModel.setSelectedDate(budgetDate);
+
+		BudgetCategory expenseCategory = null;
+		for (BudgetCategory bc : document.getBudgetCategories()) {
+			if (!bc.isIncome()) {
+				expenseCategory = bc;
+				break;
+			}
+		}
+		assertNotNull("Expense category should be available", expenseCategory);
+
+		Account account = ModelFactory.createAccount("Fallback Account", document.getAccountTypes().get(0));
+		document.addAccount(account);
+		Transaction transaction = ModelFactory.createTransaction(budgetDate, "Fallback expense", 2500L, account, expenseCategory);
+		document.addTransaction(transaction);
+
+		viewModel.refresh();
+
+		String netIncomeText = viewModel.getNetIncomeText();
+		String expected = TextFormatter.getHtmlWrapper(TextFormatter.getFormattedCurrency(-2500L));
+		assertEquals("Net income text should fall back to actual net when no budgets are set", expected, netIncomeText);
 	}
 }
 
