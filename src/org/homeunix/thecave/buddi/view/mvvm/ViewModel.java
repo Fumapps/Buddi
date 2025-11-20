@@ -29,4 +29,12 @@ public abstract class ViewModel {
     public void initialize() {
         // Default no-op
     }
+
+    /**
+     * Lifecycle method called when the ViewModel is being destroyed.
+     * Subclasses should override this to clean up resources (listeners, etc.).
+     */
+    public void dispose() {
+        // Default no-op
+    }
 }

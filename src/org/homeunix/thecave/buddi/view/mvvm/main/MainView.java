@@ -5,6 +5,7 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import org.homeunix.thecave.buddi.view.mvvm.View;
+import org.homeunix.thecave.buddi.view.mvvm.myaccounts.MyAccountsView;
 
 public class MainView implements View<MainViewModel> {
 
@@ -27,9 +28,13 @@ public class MainView implements View<MainViewModel> {
     @Override
     public void bind(MainViewModel viewModel) {
         this.viewModel = viewModel;
-        // Bind properties here
-        // root.titleProperty().bind(viewModel.titleProperty()); // Note: Stage title is
-        // handled in Application start
+
+        // Initialize and bind MyAccountsView
+        if (viewModel.getMyAccountsViewModel() != null) {
+            MyAccountsView myAccountsView = new MyAccountsView();
+            myAccountsView.bind(viewModel.getMyAccountsViewModel());
+            root.setCenter(myAccountsView.getRoot());
+        }
     }
 
     @Override
