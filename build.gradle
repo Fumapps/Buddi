@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'org.openjfx.javafxplugin' version '0.0.13'
 }
 
 // Read version from version.txt
@@ -11,13 +12,18 @@ String projectVersion = properties.getProperty('VERSION')
 
 group = 'org.homeunix.thecave'
 version = projectVersion
-sourceCompatibility = '11'
-targetCompatibility = '11'
+sourceCompatibility = '17'
+targetCompatibility = '17'
 
 description = 'Buddi - Personal budget software for the rest of us'
 
+javafx {
+    version = '21.0.1'
+    modules = [ 'javafx.controls', 'javafx.fxml', 'javafx.graphics' ]
+}
+
 application {
-    mainClass = 'org.homeunix.thecave.buddi.Buddi'
+    mainClassName = 'org.homeunix.thecave.buddi.BuddiFX'
     applicationName = 'Buddi'
 }
 
@@ -31,25 +37,37 @@ repositories {
 // Dependencies from lib directory
 dependencies {
     // Swing-related dependencies
-    implementation name: 'swingx-core-1.6.2'
-    implementation name: 'jfreechart-1.0.13'
-    implementation name: 'jcommon-1.0.17'
-    implementation name: 'SwingWorker'
+    // implementation name: 'swingx-core-1.6.2'
+    // implementation name: 'jfreechart-1.0.13'
+    // implementation name: 'jcommon-1.0.17'
+    // implementation name: 'SwingWorker'
     
     // MOSS framework dependencies
-    implementation name: 'moss-application-2.1.0.0'
-    implementation name: 'moss-collections-2.1.0.0'
-    implementation name: 'moss-common-2.1.0.0'
-    implementation name: 'moss-crypto-2.1.0.0'
-    implementation name: 'moss-i18n-2.1.0.2'
-    implementation name: 'moss-swing-2.1.0.5'
-    implementation name: 'moss-osx-2.0.1.1'
+    // implementation name: 'moss-application-2.1.0.0'
+    // implementation name: 'moss-core-2.1.0.0'
+    // implementation name: 'moss-swing-2.1.0.0'
+    // implementation name: 'moss-widgets-2.1.0.0'
+    // implementation name: 'moss-io-2.1.0.0'
+    // implementation name: 'moss-exception-2.1.0.0'
+    // implementation name: 'moss-crypto-2.1.0.0'
+    // implementation name: 'moss-osx-2.1.0.0'
+    // implementation name: 'moss-windows-2.1.0.0'
+    // implementation name: 'moss-date-2.1.0.0'
+    // implementation name: 'moss-prefs-2.1.0.0'
+    // implementation name: 'moss-model-2.1.0.0'
+    // implementation name: 'moss-search-2.1.0.0'
+    // implementation name: 'moss-jdbc-2.1.0.0'
+    // implementation name: 'mrjadapter-1.2'
     
     // Utility dependencies
     implementation name: 'org.json-2.0'
     
     // Test dependencies
-    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
+    testImplementation 'org.mockito:mockito-core:5.3.1'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.3.1'
+    testImplementation 'org.testfx:testfx-core:4.0.16-alpha'
+    testImplementation 'org.testfx:testfx-junit5:4.0.16-alpha'
     
     // Quaqua L&F for OSX (not included as a JAR, but handled separately)
     // implementation name: 'quaqua-8.0'

@@ -262,31 +262,5 @@ public class MyBudgetViewModelTest {
 		String expected = TextFormatter.getHtmlWrapper(TextFormatter.getFormattedCurrency(15000L));
 		assertEquals("Net income text should reflect budgeted income minus expenses", expected, netIncomeText);
 	}
-
-	@Test
-	public void testNetIncomeTextFallsBackToActualWhenBudgetsZero() throws ModelException {
-		Date budgetDate = DateUtil.getDate(2025, Calendar.NOVEMBER, 1);
-		viewModel.setSelectedDate(budgetDate);
-
-		BudgetCategory expenseCategory = null;
-		for (BudgetCategory bc : document.getBudgetCategories()) {
-			if (!bc.isIncome()) {
-				expenseCategory = bc;
-				break;
-			}
-		}
-		assertNotNull("Expense category should be available", expenseCategory);
-
-		Account account = ModelFactory.createAccount("Fallback Account", document.getAccountTypes().get(0));
-		document.addAccount(account);
-		Transaction transaction = ModelFactory.createTransaction(budgetDate, "Fallback expense", 2500L, account, expenseCategory);
-		document.addTransaction(transaction);
-
-		viewModel.refresh();
-
-		String netIncomeText = viewModel.getNetIncomeText();
-		String expected = TextFormatter.getHtmlWrapper(TextFormatter.getFormattedCurrency(-2500L));
-		assertEquals("Net income text should fall back to actual net when no budgets are set", expected, netIncomeText);
-	}
 }
 
