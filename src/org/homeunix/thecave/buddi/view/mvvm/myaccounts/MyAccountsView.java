@@ -72,6 +72,25 @@ public class MyAccountsView implements View<MyAccountsViewModel> {
 
         accountTree.setRoot(rootItem);
         accountTree.setShowRoot(false);
+
+        // Set CellFactory to render AccountType and Account objects correctly
+        accountTree.setCellFactory(tv -> new javafx.scene.control.TreeCell<Object>() {
+            @Override
+            protected void updateItem(Object item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    if (item instanceof org.homeunix.thecave.buddi.model.AccountType) {
+                        setText(((org.homeunix.thecave.buddi.model.AccountType) item).getName());
+                    } else if (item instanceof org.homeunix.thecave.buddi.model.Account) {
+                        setText(((org.homeunix.thecave.buddi.model.Account) item).getName());
+                    } else {
+                        setText(item.toString());
+                    }
+                }
+            }
+        });
     }
 
     @Override

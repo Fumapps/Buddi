@@ -72,10 +72,10 @@ public class MyAccountsViewModel extends ViewModel {
 	public void refresh() {
 		// Compute net worth and format it
 		long netWorthValue = document.getNetWorth(null);
-		String newText = TextFormatter.getHtmlWrapper(
-				PrefsModel.getInstance().getTranslator().get(BuddiKeys.NET_WORTH)
-						+ ": "
-						+ TextFormatter.getFormattedCurrency(netWorthValue));
+		// Remove HTML wrapper for JavaFX
+		String newText = PrefsModel.getInstance().getTranslator().get(BuddiKeys.NET_WORTH)
+				+ ": "
+				+ TextFormatter.getFormattedCurrency(netWorthValue);
 
 		// Update on FX thread
 		Platform.runLater(() -> {
