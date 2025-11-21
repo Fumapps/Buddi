@@ -37,6 +37,12 @@ public class TransactionViewModel extends ViewModel {
     // Available Sources for ComboBoxes
     private final ObservableList<Source> availableSources = FXCollections.observableArrayList();
 
+    // Split Management
+    private final ObservableList<TransactionSplit> fromSplits = FXCollections.observableArrayList();
+    private final ObservableList<TransactionSplit> toSplits = FXCollections.observableArrayList();
+
+    public static final Source SPLIT_SOURCE = new SplitSource();
+
     public TransactionViewModel(Document document, Account account) {
         this.document = document;
         this.account = account;
@@ -52,17 +58,36 @@ public class TransactionViewModel extends ViewModel {
                 clearEditor();
             }
         });
+
+        // Listen for Split selection
+        from.addListener((obs, oldVal, newVal) -> {
+            if (newVal == SPLIT_SOURCE) {
+                openSplitEditor(fromSplits, "Edit From Splits");
+                updateAmountFromSplits(fromSplits);
+            }
+        });
+
+        to.addListener((obs, oldVal, newVal) -> {
+            if (newVal == SPLIT_SOURCE) {
+                openSplitEditor(toSplits, "Edit To Splits");
+                updateAmountFromSplits(toSplits);
+            }
+        });
+    }
+
+    private void openSplitEditor(ObservableList<TransactionSplit> splits, String title) {
+        SplitTransactionView dialog = new SplitTransactionView(splits, availableSources);
+        dialog.setTitle(title);
+        dialog.showAndWait();
+    }
+
+    private void updateAmountFromSplits(ObservableList<TransactionSplit> splits) {
+        long total = splits.stream().mapToLong(TransactionSplit::getAmount).sum();
+        amount.set(TextFormatter.getFormattedCurrency(total).replaceAll("[^0-9.,]", ""));
     }
 
     private void loadTransactions() {
         if (document != null && account != null) {
-            // In a real implementation, we might want to filter or sort
-            // For now, just get all transactions involving this account?
-            // The Swing implementation likely iterates all transactions and filters.
-            // Or Account might have a getTransactions() method?
-            // Checking Account interface... it doesn't have getTransactions().
-            // Document has getTransactions().
-
             List<Transaction> allTransactions = document.getTransactions();
             List<Transaction> accountTransactions = allTransactions.stream()
                     .filter(t -> t.getFrom().equals(account) || t.getTo().equals(account))
@@ -75,6 +100,7 @@ public class TransactionViewModel extends ViewModel {
     private void loadSources() {
         if (document != null) {
             availableSources.clear();
+            availableSources.add(SPLIT_SOURCE); // Add Split option
             availableSources.addAll(document.getAccounts());
             availableSources.addAll(document.getBudgetCategories());
         }
@@ -83,9 +109,26 @@ public class TransactionViewModel extends ViewModel {
     private void loadTransactionIntoEditor(Transaction t) {
         date.set(t.getDate());
         description.set(t.getDescription());
-        amount.set(TextFormatter.getFormattedCurrency(t.getAmount()).replaceAll("[^0-9.,]", "")); // Simple formatting
-        from.set(t.getFrom());
-        to.set(t.getTo());
+        amount.set(TextFormatter.getFormattedCurrency(t.getAmount()).replaceAll("[^0-9.,]", ""));
+
+        // Handle Splits
+        fromSplits.clear();
+        toSplits.clear();
+
+        if (t.getFrom() instanceof Split) {
+            from.set(SPLIT_SOURCE);
+            fromSplits.addAll(t.getFromSplits());
+        } else {
+            from.set(t.getFrom());
+        }
+
+        if (t.getTo() instanceof Split) {
+            to.set(SPLIT_SOURCE);
+            toSplits.addAll(t.getToSplits());
+        } else {
+            to.set(t.getTo());
+        }
+
         memo.set(t.getMemo());
         number.set(t.getNumber());
 
@@ -108,13 +151,13 @@ public class TransactionViewModel extends ViewModel {
         number.set("");
         cleared.set(false);
         reconciled.set(false);
-        selectedTransaction.set(null); // Deselect to indicate "New" mode
+        fromSplits.clear();
+        toSplits.clear();
+        selectedTransaction.set(null);
     }
 
     public void createNewTransaction() {
         clearEditor();
-        // Set defaults if needed
-        // For example, if we are in "Checking", "From" might default to "Checking"
         from.set(account);
     }
 
@@ -123,20 +166,32 @@ public class TransactionViewModel extends ViewModel {
             Transaction t = selectedTransaction.get();
             boolean isNew = (t == null);
 
+            // Determine actual From/To sources (handle SplitSource)
+            Source actualFrom = from.get() == SPLIT_SOURCE ? ModelFactory.createSplit() : from.get();
+            Source actualTo = to.get() == SPLIT_SOURCE ? ModelFactory.createSplit() : to.get();
+
             if (isNew) {
-                t = ModelFactory.createTransaction(date.get(), description.get(), parseAmount(amount.get()), from.get(),
-                        to.get());
+                t = ModelFactory.createTransaction(date.get(), description.get(), parseAmount(amount.get()), actualFrom,
+                        actualTo);
                 document.addTransaction(t);
             } else {
                 t.setDate(date.get());
                 t.setDescription(description.get());
                 t.setAmount(parseAmount(amount.get()));
-                t.setFrom(from.get());
-                t.setTo(to.get());
+                t.setFrom(actualFrom);
+                t.setTo(actualTo);
             }
 
             t.setMemo(memo.get());
             t.setNumber(number.get());
+
+            // Save Splits if applicable
+            if (actualFrom instanceof Split) {
+                t.setFromSplits(fromSplits);
+            }
+            if (actualTo instanceof Split) {
+                t.setToSplits(toSplits);
+            }
 
             if (t.getFrom().equals(account)) {
                 t.setClearedFrom(cleared.get());
@@ -150,20 +205,16 @@ public class TransactionViewModel extends ViewModel {
                 transactions.add(t);
                 selectedTransaction.set(t);
             } else {
-                // Refresh list item?
                 int index = transactions.indexOf(t);
                 if (index >= 0) {
                     transactions.set(index, t);
                 }
             }
 
-            // Update balances
             account.updateBalance();
-            // Ideally we should trigger a global refresh or event
 
         } catch (InvalidValueException e) {
             e.printStackTrace();
-            // Show error to user
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -176,6 +227,14 @@ public class TransactionViewModel extends ViewModel {
         } catch (Exception e) {
             return 0;
         }
+    }
+
+    public ObservableList<TransactionSplit> getFromSplits() {
+        return fromSplits;
+    }
+
+    public ObservableList<TransactionSplit> getToSplits() {
+        return toSplits;
     }
 
     // Getters for Properties
@@ -230,4 +289,92 @@ public class TransactionViewModel extends ViewModel {
     public Account getAccount() {
         return account;
     }
-}
+
+    // Dummy Source for Split Selection
+    private static class SplitSource implements Source {
+        @Override
+        public String getFullName() {
+            return "Split";
+        }
+
+        @Override
+        public String getName() {
+            return "Split";
+        }
+
+        @Override
+        public String getNotes() {
+            return "";
+        }
+
+        @Override
+        public boolean isDeleted() {
+            return false;
+        }
+
+        @Override
+        public void setDeleted(boolean deleted) throws InvalidValueException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void setName(String name) throws InvalidValueException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void setNotes(String notes) throws InvalidValueException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int compareTo(ModelObject o) {
+            return 0;
+        }
+
+        @Override
+        public Document getDocument() {
+            return null;
+        }
+
+        @Override
+        public String getUid() {
+            return "SPLIT";
+        }
+
+        public void setDocument(Document document) {
+        }
+
+        @Override
+        public void setUid(String uid) throws InvalidValueException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String toString() {
+            return "Split";
+        }
+
+        @Override
+        public boolean getModified() {
+            return false;
+        }
+
+        @Override
+        public void setChanged() {
+        }
+
+        @Override
+        public void setModified(boolean modified) {
+        }
+
+        @Override
+        public Date getModifiedDate() {
+            return new Date();
+        }
+
+        @Override
+        public void setModifiedDate(Date date) {
+        }
+    }
+}```
