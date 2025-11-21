@@ -75,6 +75,7 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
 
         // Center: TreeTableView
         treeTableView.setShowRoot(false);
+        treeTableView.setEditable(true); // Enable editing
         @SuppressWarnings("deprecation")
         javafx.scene.control.TreeTableView.TreeTableViewSelectionModel<BudgetCategory> sm = treeTableView
                 .getSelectionModel(); // Just to use the variable if needed, but mainly to suppress deprecation on the
@@ -87,20 +88,8 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
 
         TreeTableColumn<BudgetCategory, BudgetCategory> amountColumn = new TreeTableColumn<>("Budgeted Amount");
         amountColumn.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue().getValue()));
-        amountColumn.setCellFactory(param -> new TreeTableCell<BudgetCategory, BudgetCategory>() {
-            @Override
-            protected void updateItem(BudgetCategory item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null || viewModel == null || viewModel.selectedDateProperty().get() == null) {
-                    setText(null);
-                } else {
-                    long amount = item.getAmount(viewModel.selectedDateProperty().get());
-                    String formatted = TextFormatter.getFormattedCurrency(amount);
-                    formatted = formatted.replaceAll("<[^>]+>", ""); // Strip HTML
-                    setText(formatted);
-                }
-            }
-        });
+        amountColumn.setCellFactory(param -> new EditingCell());
+        amountColumn.setEditable(true);
 
         treeTableView.getColumns().addAll(nameColumn, amountColumn);
 
@@ -211,5 +200,133 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
     @Override
     public Parent getRoot() {
         return root;
+    }
+
+    private class EditingCell extends TreeTableCell<BudgetCategory, BudgetCategory> {
+
+        private javafx.scene.control.TextField textField;
+
+        public EditingCell() {
+        }
+
+        @Override
+        public void startEdit() {
+            if (!isEmpty()) {
+                super.startEdit();
+                createTextField();
+                setText(null);
+                setGraphic(textField);
+                textField.selectAll();
+            }
+        }
+
+        @Override
+        public void cancelEdit() {
+            super.cancelEdit();
+            setText(getItemText());
+            setGraphic(null);
+        }
+
+        @Override
+        public void updateItem(BudgetCategory item, boolean empty) {
+            super.updateItem(item, empty);
+
+            if (empty || item == null || viewModel == null || viewModel.selectedDateProperty().get() == null) {
+                setText(null);
+                setGraphic(null);
+            } else {
+                if (isEditing()) {
+                    if (textField != null) {
+                        textField.setText(getString());
+                    }
+                    setText(null);
+                    setGraphic(textField);
+                } else {
+                    setText(getItemText());
+                    setGraphic(null);
+                }
+            }
+        }
+
+        private void createTextField() {
+            textField = new javafx.scene.control.TextField(getString());
+            textField.setMinWidth(this.getWidth() - this.getGraphicTextGap() * 2);
+            textField.focusedProperty().addListener((arg0, arg1, arg2) -> {
+                if (!arg2) {
+                    commitEdit(getItem());
+                }
+            });
+
+            textField.setOnKeyPressed(t -> {
+                if (t.getCode() == javafx.scene.input.KeyCode.ENTER) {
+                    commitEdit(getItem());
+                } else if (t.getCode() == javafx.scene.input.KeyCode.ESCAPE) {
+                    cancelEdit();
+                }
+            });
+        }
+
+        private String getString() {
+            return getItem() == null ? "" : String.valueOf(getItem().getAmount(viewModel.selectedDateProperty().get()));
+        }
+
+        private String getItemText() {
+            if (getItem() == null || viewModel == null || viewModel.selectedDateProperty().get() == null) {
+                return "";
+            }
+            long amount = getItem().getAmount(viewModel.selectedDateProperty().get());
+            String formatted = TextFormatter.getFormattedCurrency(amount);
+            return formatted.replaceAll("<[^>]+>", ""); // Strip HTML
+        }
+
+        @Override
+        public void commitEdit(BudgetCategory item) {
+            if (isEditing()) {
+                super.commitEdit(item);
+            } else {
+                // If we are not in editing mode (e.g. focus lost), we still want to save
+                // But super.commitEdit() might not trigger if not editing.
+                // However, for TreeTableCell, usually startEdit is called.
+            }
+
+            if (textField != null && item != null) {
+                String text = textField.getText();
+                try {
+                    // Remove any currency symbols or non-numeric characters that might interfere,
+                    // although NumberFormat.parse usually handles symbols if they match the locale.
+                    // But to be safe and robust against simple input like "100" vs "$100.00":
+
+                    Number number = org.homeunix.thecave.buddi.util.Formatter.getDecimalFormat().parse(text);
+                    long amount = Math.round(number.doubleValue() * 100.0);
+
+                    viewModel.setBudgetAmount(item, amount);
+                } catch (java.text.ParseException e) {
+                    // Try parsing as simple integer if currency parse fails (e.g. user entered
+                    // "100" without decimals)
+                    try {
+                        long simpleAmount = Long.parseLong(text.replaceAll("[^0-9-]", ""));
+                        // Assume user entered dollars if no decimal point? Or cents?
+                        // Buddi usually assumes dollars if typing "100".
+                        // Let's stick to the DecimalFormat parser which handles "100" as 100.0
+                        // correctly.
+                        // If ParseException happened, it's likely invalid input.
+                        // We can just ignore or show error.
+                        // But wait, if we parse "100", we should probably treat it as 100.00 (10000
+                        // cents)
+                        // If we just parseLong("100") -> 100 cents = $1.00. That might be confusing.
+                        // Let's assume if it fails decimal format, we try to treat it as a plain number
+                        // and multiply by 100.
+
+                        long amount = simpleAmount * 100;
+                        viewModel.setBudgetAmount(item, amount);
+
+                    } catch (NumberFormatException nfe) {
+                        // Ignore invalid input
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 }
