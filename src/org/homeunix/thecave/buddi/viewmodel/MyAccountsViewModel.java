@@ -47,6 +47,7 @@ public class MyAccountsViewModel extends ViewModel {
 	public static final String PROPERTY_ACCOUNT_TREE_CHANGED = "accountTreeChanged";
 
 	private final StringProperty netWorth = new SimpleStringProperty();
+	private final javafx.beans.property.ObjectProperty<Object> selectedItem = new javafx.beans.property.SimpleObjectProperty<>();
 
 	public MyAccountsViewModel(Document document) {
 		super();
@@ -190,6 +191,42 @@ public class MyAccountsViewModel extends ViewModel {
 	 */
 	public Document getDocument() {
 		return document;
+	}
+
+	public javafx.beans.property.ObjectProperty<Object> selectedItemProperty() {
+		return selectedItem;
+	}
+
+	public Object getSelectedItem() {
+		return selectedItem.get();
+	}
+
+	public void openTransactions(Account account) {
+		if (account == null)
+			return;
+		System.out.println("Opening transactions for: " + account.getName());
+		// TODO: Implement actual navigation to Transaction View
+		// For now, we will just log it. The View will handle the window creation for
+		// this task.
+	}
+
+	public void createNewAccount(AccountType type) {
+		System.out.println("Creating new account of type: " + (type != null ? type.getName() : "null"));
+		// TODO: Implement new account dialog
+	}
+
+	public void editAccount(Account account) {
+		if (account == null)
+			return;
+		System.out.println("Editing account: " + account.getName());
+		// TODO: Implement edit account dialog
+	}
+
+	public void deleteAccount(Account account) {
+		if (account == null)
+			return;
+		System.out.println("Deleting account: " + account.getName());
+		// TODO: Implement delete account confirmation and logic
 	}
 
 	@Override

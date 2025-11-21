@@ -49,6 +49,29 @@ public class MyAccountsView implements View<MyAccountsViewModel> {
         // long value without a converter or listener)
         viewModel.netWorthProperty().addListener((obs, oldVal, newVal) -> updateNetWorthColor());
 
+        // Bind selection
+        accountTree.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null) {
+                viewModel.selectedItemProperty().set(newVal.getValue());
+            } else {
+                viewModel.selectedItemProperty().set(null);
+            }
+        });
+
+        // Handle double-click
+        accountTree.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2) {
+                TreeItem<Object> selectedItem = accountTree.getSelectionModel().getSelectedItem();
+                if (selectedItem != null && selectedItem.getValue() instanceof Account) {
+                    Account account = (Account) selectedItem.getValue();
+                    viewModel.openTransactions(account);
+
+                    // Open placeholder view (for verification)
+                    openTransactionView(account);
+                }
+            }
+        });
+
         // Populate tree (initial)
         populateTree();
 
@@ -60,6 +83,17 @@ public class MyAccountsView implements View<MyAccountsViewModel> {
                 javafx.application.Platform.runLater(this::updateNetWorthColor);
             }
         });
+    }
+
+    private void openTransactionView(Account account) {
+        org.homeunix.thecave.buddi.view.mvvm.transaction.TransactionView transactionView = new org.homeunix.thecave.buddi.view.mvvm.transaction.TransactionView(
+                account);
+
+        javafx.scene.Scene scene = new javafx.scene.Scene(transactionView.getRoot(), 600, 400);
+        javafx.stage.Stage stage = new javafx.stage.Stage();
+        stage.setTitle("Transactions - " + account.getName());
+        stage.setScene(scene);
+        stage.show();
     }
 
     private void updateNetWorthColor() {
@@ -101,6 +135,7 @@ public class MyAccountsView implements View<MyAccountsViewModel> {
                     setText(null);
                     setGraphic(null);
                     setStyle("");
+                    setContextMenu(null);
                 } else {
                     if (item instanceof AccountType) {
                         AccountType type = (AccountType) item;
@@ -112,6 +147,14 @@ public class MyAccountsView implements View<MyAccountsViewModel> {
                         } else {
                             setStyle("-fx-text-fill: black;");
                         }
+
+                        // Context Menu for Account Type
+                        javafx.scene.control.ContextMenu contextMenu = new javafx.scene.control.ContextMenu();
+                        javafx.scene.control.MenuItem newItem = new javafx.scene.control.MenuItem("New Account");
+                        newItem.setOnAction(e -> viewModel.createNewAccount(type));
+                        contextMenu.getItems().add(newItem);
+                        setContextMenu(contextMenu);
+
                     } else if (item instanceof Account) {
                         Account account = (Account) item;
                         String name = account.getName();
@@ -137,9 +180,28 @@ public class MyAccountsView implements View<MyAccountsViewModel> {
                         if (account.isDeleted()) {
                             setStyle(getStyle() + "-fx-strikethrough: true;");
                         }
+
+                        // Context Menu for Account
+                        javafx.scene.control.ContextMenu contextMenu = new javafx.scene.control.ContextMenu();
+                        javafx.scene.control.MenuItem openItem = new javafx.scene.control.MenuItem("Open Transactions");
+                        openItem.setOnAction(e -> {
+                            viewModel.openTransactions(account);
+                            openTransactionView(account);
+                        });
+
+                        javafx.scene.control.MenuItem editItem = new javafx.scene.control.MenuItem("Edit");
+                        editItem.setOnAction(e -> viewModel.editAccount(account));
+
+                        javafx.scene.control.MenuItem deleteItem = new javafx.scene.control.MenuItem("Delete");
+                        deleteItem.setOnAction(e -> viewModel.deleteAccount(account));
+
+                        contextMenu.getItems().addAll(openItem, editItem, deleteItem);
+                        setContextMenu(contextMenu);
+
                     } else {
                         setText(item.toString());
                         setStyle("");
+                        setContextMenu(null);
                     }
                 }
             }
