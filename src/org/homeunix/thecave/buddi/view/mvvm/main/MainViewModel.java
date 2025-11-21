@@ -13,6 +13,7 @@ public class MainViewModel extends ViewModel {
 
     private Document document;
     private MyAccountsViewModel myAccountsViewModel;
+    private org.homeunix.thecave.buddi.view.mvvm.mybudget.MyBudgetViewModel myBudgetViewModel;
 
     public StringProperty titleProperty() {
         return title;
@@ -30,6 +31,10 @@ public class MainViewModel extends ViewModel {
         return myAccountsViewModel;
     }
 
+    public org.homeunix.thecave.buddi.view.mvvm.mybudget.MyBudgetViewModel getMyBudgetViewModel() {
+        return myBudgetViewModel;
+    }
+
     @Override
     public void initialize() {
         super.initialize();
@@ -37,6 +42,7 @@ public class MainViewModel extends ViewModel {
             // Load default or autosaved document
             this.document = ModelFactory.createDocument();
             this.myAccountsViewModel = new MyAccountsViewModel(document);
+            this.myBudgetViewModel = new org.homeunix.thecave.buddi.view.mvvm.mybudget.MyBudgetViewModel(document);
         } catch (Exception e) {
             e.printStackTrace();
             // TODO: Handle error gracefully (show alert)

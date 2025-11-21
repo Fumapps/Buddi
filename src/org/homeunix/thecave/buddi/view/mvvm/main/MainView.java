@@ -2,39 +2,52 @@ package org.homeunix.thecave.buddi.view.mvvm.main;
 
 import javafx.scene.Parent;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import org.homeunix.thecave.buddi.view.mvvm.View;
 import org.homeunix.thecave.buddi.view.mvvm.myaccounts.MyAccountsView;
+import org.homeunix.thecave.buddi.view.mvvm.mybudget.MyBudgetView;
 
 public class MainView implements View<MainViewModel> {
 
     private final BorderPane root;
     private MainViewModel viewModel;
 
+    private final MyAccountsView myAccountsView;
+    private final MyBudgetView myBudgetView;
+
     public MainView() {
         this.root = new BorderPane();
+        this.myAccountsView = new MyAccountsView();
+        this.myBudgetView = new MyBudgetView();
         initializeUI();
     }
 
     private void initializeUI() {
-        Label welcomeLabel = new Label("Welcome to Buddi (JavaFX)");
-        welcomeLabel.setStyle("-fx-font-size: 24px; -fx-text-fill: #333;");
+        TabPane tabPane = new TabPane();
 
-        StackPane centerPane = new StackPane(welcomeLabel);
-        root.setCenter(centerPane);
+        Tab accountsTab = new Tab("My Accounts");
+        accountsTab.setClosable(false);
+        accountsTab.setContent(myAccountsView.getRoot());
+
+        Tab budgetTab = new Tab("My Budget");
+        budgetTab.setClosable(false);
+        budgetTab.setContent(myBudgetView.getRoot());
+
+        tabPane.getTabs().addAll(accountsTab, budgetTab);
+
+        root.setCenter(tabPane);
     }
 
     @Override
     public void bind(MainViewModel viewModel) {
         this.viewModel = viewModel;
 
-        // Initialize and bind MyAccountsView
-        if (viewModel.getMyAccountsViewModel() != null) {
-            MyAccountsView myAccountsView = new MyAccountsView();
-            myAccountsView.bind(viewModel.getMyAccountsViewModel());
-            root.setCenter(myAccountsView.getRoot());
-        }
+        // Bind child views
+        myAccountsView.bind(viewModel.getMyAccountsViewModel());
+        myBudgetView.bind(viewModel.getMyBudgetViewModel());
     }
 
     @Override
