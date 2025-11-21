@@ -86,10 +86,12 @@ public class MyAccountsView implements View<MyAccountsViewModel> {
     }
 
     private void openTransactionView(Account account) {
-        org.homeunix.thecave.buddi.view.mvvm.transaction.TransactionView transactionView = new org.homeunix.thecave.buddi.view.mvvm.transaction.TransactionView(
-                account);
+        org.homeunix.thecave.buddi.view.mvvm.transaction.TransactionViewModel txViewModel = viewModel
+                .createTransactionViewModel(account);
+        org.homeunix.thecave.buddi.view.mvvm.transaction.TransactionView txView = new org.homeunix.thecave.buddi.view.mvvm.transaction.TransactionView();
+        txView.bind(txViewModel);
 
-        javafx.scene.Scene scene = new javafx.scene.Scene(transactionView.getRoot(), 600, 400);
+        javafx.scene.Scene scene = new javafx.scene.Scene(txView.getRoot(), 800, 600);
         javafx.stage.Stage stage = new javafx.stage.Stage();
         stage.setTitle("Transactions - " + account.getName());
         stage.setScene(scene);

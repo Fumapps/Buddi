@@ -223,10 +223,13 @@ public class MyAccountsViewModel extends ViewModel {
 	}
 
 	public void deleteAccount(Account account) {
-		if (account == null)
-			return;
-		System.out.println("Deleting account: " + account.getName());
-		// TODO: Implement delete account confirmation and logic
+		// TODO: Implement delete logic
+		System.out.println("Delete account: " + account);
+	}
+
+	public org.homeunix.thecave.buddi.view.mvvm.transaction.TransactionViewModel createTransactionViewModel(
+			Account account) {
+		return new org.homeunix.thecave.buddi.view.mvvm.transaction.TransactionViewModel(document, account);
 	}
 
 	@Override
