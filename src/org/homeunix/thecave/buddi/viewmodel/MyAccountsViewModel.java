@@ -75,7 +75,13 @@ public class MyAccountsViewModel extends ViewModel {
 		// Remove HTML wrapper for JavaFX
 		String newText = PrefsModel.getInstance().getTranslator().get(BuddiKeys.NET_WORTH)
 				+ ": "
-				+ TextFormatter.getFormattedCurrency(netWorthValue);
+				+ TextFormatter.getFormattedCurrency(netWorthValue, false, false).replaceAll("<[^>]+>", ""); // Strip
+																												// any
+																												// remaining
+																												// HTML
+																												// just
+																												// in
+																												// case
 
 		// Update on FX thread
 		Platform.runLater(() -> {
@@ -101,6 +107,10 @@ public class MyAccountsViewModel extends ViewModel {
 
 	public StringProperty netWorthProperty() {
 		return netWorth;
+	}
+
+	public long getNetWorthValue() {
+		return document.getNetWorth(null);
 	}
 
 	/**

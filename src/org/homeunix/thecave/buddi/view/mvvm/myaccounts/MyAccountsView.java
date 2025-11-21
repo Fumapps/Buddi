@@ -11,6 +11,8 @@ import org.homeunix.thecave.buddi.model.AccountType;
 import org.homeunix.thecave.buddi.view.mvvm.View;
 import org.homeunix.thecave.buddi.viewmodel.MyAccountsViewModel;
 
+import org.homeunix.thecave.buddi.util.InternalFormatter;
+
 public class MyAccountsView implements View<MyAccountsViewModel> {
 
     private final BorderPane root;
@@ -38,8 +40,14 @@ public class MyAccountsView implements View<MyAccountsViewModel> {
     public void bind(MyAccountsViewModel viewModel) {
         this.viewModel = viewModel;
 
-        // Bind net worth
+        // Bind net worth text
         netWorthLabel.textProperty().bind(viewModel.netWorthProperty());
+
+        // Update net worth color based on value
+        updateNetWorthColor();
+        // Listen for changes to update color (since we can't easily bind color to a
+        // long value without a converter or listener)
+        viewModel.netWorthProperty().addListener((obs, oldVal, newVal) -> updateNetWorthColor());
 
         // Populate tree (initial)
         populateTree();
@@ -48,8 +56,19 @@ public class MyAccountsView implements View<MyAccountsViewModel> {
         viewModel.addPropertyChangeListener(evt -> {
             if (MyAccountsViewModel.PROPERTY_ACCOUNT_TREE_CHANGED.equals(evt.getPropertyName())) {
                 javafx.application.Platform.runLater(this::populateTree);
+            } else if (MyAccountsViewModel.PROPERTY_NET_WORTH_TEXT.equals(evt.getPropertyName())) {
+                javafx.application.Platform.runLater(this::updateNetWorthColor);
             }
         });
+    }
+
+    private void updateNetWorthColor() {
+        long netWorth = viewModel.getNetWorthValue();
+        if (netWorth < 0) {
+            netWorthLabel.setStyle("-fx-font-weight: bold; -fx-padding: 10; -fx-text-fill: red;");
+        } else {
+            netWorthLabel.setStyle("-fx-font-weight: bold; -fx-padding: 10; -fx-text-fill: black;");
+        }
     }
 
     private void populateTree() {
@@ -80,13 +99,47 @@ public class MyAccountsView implements View<MyAccountsViewModel> {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
                     setText(null);
+                    setGraphic(null);
+                    setStyle("");
                 } else {
-                    if (item instanceof org.homeunix.thecave.buddi.model.AccountType) {
-                        setText(((org.homeunix.thecave.buddi.model.AccountType) item).getName());
-                    } else if (item instanceof org.homeunix.thecave.buddi.model.Account) {
-                        setText(((org.homeunix.thecave.buddi.model.Account) item).getName());
+                    if (item instanceof AccountType) {
+                        AccountType type = (AccountType) item;
+                        setText(type.getName());
+
+                        // Style based on credit/debit
+                        if (type.isCredit()) {
+                            setStyle("-fx-text-fill: red;");
+                        } else {
+                            setStyle("-fx-text-fill: black;");
+                        }
+                    } else if (item instanceof Account) {
+                        Account account = (Account) item;
+                        String name = account.getName();
+                        String balance = org.homeunix.thecave.buddi.plugin.api.util.TextFormatter
+                                .getFormattedCurrency(account.getBalance(), false, account.getAccountType().isCredit());
+
+                        // Strip HTML from balance if present (TextFormatter might still return it
+                        // depending on flags)
+                        balance = balance.replaceAll("<[^>]+>", "");
+
+                        setText(name + " - " + balance);
+
+                        // Style based on credit/debit and negative balance
+                        boolean isRed = InternalFormatter.isRed(account, account.getBalance());
+                        if (isRed) {
+                            setStyle("-fx-text-fill: red;");
+                        } else {
+                            setStyle("-fx-text-fill: black;");
+                        }
+
+                        // Strikethrough for deleted accounts (though they are filtered out in
+                        // populateTree currently)
+                        if (account.isDeleted()) {
+                            setStyle(getStyle() + "-fx-strikethrough: true;");
+                        }
                     } else {
                         setText(item.toString());
+                        setStyle("");
                     }
                 }
             }
