@@ -6,6 +6,7 @@ import javafx.collections.ObservableList;
 import org.homeunix.thecave.buddi.model.*;
 import org.homeunix.thecave.buddi.model.impl.ModelFactory;
 import org.homeunix.thecave.buddi.plugin.api.exception.InvalidValueException;
+import org.homeunix.thecave.buddi.plugin.api.exception.ModelException;
 import org.homeunix.thecave.buddi.plugin.api.util.TextFormatter;
 import org.homeunix.thecave.buddi.util.Formatter;
 import org.homeunix.thecave.buddi.view.mvvm.ViewModel;
@@ -161,8 +162,68 @@ public class TransactionViewModel extends ViewModel {
         from.set(account);
     }
 
-    public void save() {
+    public void delete() {
         try {
+            Transaction t = selectedTransaction.get();
+            if (t != null) {
+                document.removeTransaction(t);
+                transactions.remove(t);
+                clearEditor();
+                account.updateBalance();
+            }
+        } catch (ModelException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public String validate() {
+        if (description.get() == null || description.get().trim().isEmpty()) {
+            return "Description cannot be empty.";
+        }
+        if (date.get() == null) {
+            return "Date cannot be empty.";
+        }
+
+        if (from.get() == null) {
+            return "Source (From) cannot be empty.";
+        }
+        if (to.get() == null) {
+            return "Destination (To) cannot be empty.";
+        }
+
+        long totalAmount = parseAmount(amount.get());
+
+        // Validate Splits
+        if (from.get() == SPLIT_SOURCE) {
+            long splitTotal = fromSplits.stream().mapToLong(TransactionSplit::getAmount).sum();
+            if (splitTotal != totalAmount) {
+                return "From splits total (" + TextFormatter.getFormattedCurrency(splitTotal) +
+                        ") does not match transaction amount (" + TextFormatter.getFormattedCurrency(totalAmount)
+                        + ").";
+            }
+        }
+
+        if (to.get() == SPLIT_SOURCE) {
+            long splitTotal = toSplits.stream().mapToLong(TransactionSplit::getAmount).sum();
+            if (splitTotal != totalAmount) {
+                return "To splits total (" + TextFormatter.getFormattedCurrency(splitTotal) +
+                        ") does not match transaction amount (" + TextFormatter.getFormattedCurrency(totalAmount)
+                        + ").";
+            }
+        }
+
+        return null; // Valid
+    }
+
+    public boolean save() {
+        try {
+            String validationError = validate();
+            if (validationError != null) {
+                // View should handle this, but for now we return false to indicate failure
+                // In a pure MVVM way, we might have a validationError property
+                return false;
+            }
+
             Transaction t = selectedTransaction.get();
             boolean isNew = (t == null);
 
@@ -212,11 +273,14 @@ public class TransactionViewModel extends ViewModel {
             }
 
             account.updateBalance();
+            return true;
 
         } catch (InvalidValueException e) {
             e.printStackTrace();
+            return false;
         } catch (Exception e) {
             e.printStackTrace();
+            return false;
         }
     }
 
@@ -342,12 +406,8 @@ public class TransactionViewModel extends ViewModel {
             return "SPLIT";
         }
 
-        public void setDocument(Document document) {
-        }
-
         @Override
-        public void setUid(String uid) throws InvalidValueException {
-            throw new UnsupportedOperationException();
+        public void setDocument(Document document) {
         }
 
         @Override
@@ -356,25 +416,12 @@ public class TransactionViewModel extends ViewModel {
         }
 
         @Override
-        public boolean getModified() {
-            return false;
-        }
-
-        @Override
         public void setChanged() {
         }
 
         @Override
-        public void setModified(boolean modified) {
-        }
-
-        @Override
-        public Date getModifiedDate() {
+        public Date getModified() {
             return new Date();
         }
-
-        @Override
-        public void setModifiedDate(Date date) {
-        }
     }
-}```
+}

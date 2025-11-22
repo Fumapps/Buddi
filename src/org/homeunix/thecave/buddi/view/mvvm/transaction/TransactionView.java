@@ -194,10 +194,38 @@ public class TransactionView implements View<TransactionViewModel> {
         toCombo.valueProperty().bindBidirectional(viewModel.toProperty());
 
         // Buttons
-        saveButton.setOnAction(e -> viewModel.save());
+        saveButton.setOnAction(e -> {
+            String error = viewModel.validate();
+            if (error != null) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Validation Error");
+                alert.setHeaderText(null);
+                alert.setContentText(error);
+                alert.showAndWait();
+            } else {
+                viewModel.save();
+            }
+        });
+
         newButton.setOnAction(e -> {
             table.getSelectionModel().clearSelection();
             viewModel.createNewTransaction();
+        });
+
+        deleteButton.setOnAction(e -> {
+            if (viewModel.selectedTransactionProperty().get() == null) {
+                return;
+            }
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Delete Transaction");
+            alert.setHeaderText(null);
+            alert.setContentText("Are you sure you want to delete this transaction?");
+
+            alert.showAndWait().ifPresent(response -> {
+                if (response == ButtonType.OK) {
+                    viewModel.delete();
+                }
+            });
         });
     }
 

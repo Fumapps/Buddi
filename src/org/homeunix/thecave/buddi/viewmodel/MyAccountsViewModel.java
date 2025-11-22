@@ -211,20 +211,46 @@ public class MyAccountsViewModel extends ViewModel {
 	}
 
 	public void createNewAccount(AccountType type) {
-		System.out.println("Creating new account of type: " + (type != null ? type.getName() : "null"));
-		// TODO: Implement new account dialog
+		// Show dialog
+		org.homeunix.thecave.buddi.view.mvvm.myaccounts.AccountEditorDialog dialog = new org.homeunix.thecave.buddi.view.mvvm.myaccounts.AccountEditorDialog(
+				getAccountTypes(), null);
+		java.util.Optional<Account> result = dialog.showAndWait();
+
+		result.ifPresent(account -> {
+			try {
+				if (type != null) {
+					account.setAccountType(type);
+				}
+				document.addAccount(account);
+				refresh();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		});
 	}
 
 	public void editAccount(Account account) {
 		if (account == null)
 			return;
-		System.out.println("Editing account: " + account.getName());
-		// TODO: Implement edit account dialog
+
+		org.homeunix.thecave.buddi.view.mvvm.myaccounts.AccountEditorDialog dialog = new org.homeunix.thecave.buddi.view.mvvm.myaccounts.AccountEditorDialog(
+				getAccountTypes(), account);
+		java.util.Optional<Account> result = dialog.showAndWait();
+
+		result.ifPresent(updatedAccount -> {
+			refresh();
+		});
 	}
 
 	public void deleteAccount(Account account) {
-		// TODO: Implement delete logic
-		System.out.println("Delete account: " + account);
+		if (account == null)
+			return;
+		try {
+			document.removeAccount(account);
+			refresh();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	public org.homeunix.thecave.buddi.view.mvvm.transaction.TransactionViewModel createTransactionViewModel(
