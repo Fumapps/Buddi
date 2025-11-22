@@ -10,6 +10,8 @@ import org.homeunix.thecave.buddi.view.mvvm.View;
 import org.homeunix.thecave.buddi.view.mvvm.myaccounts.MyAccountsView;
 import org.homeunix.thecave.buddi.view.mvvm.mybudget.MyBudgetView;
 
+import org.homeunix.thecave.buddi.view.mvvm.scheduled.ScheduledTransactionsView;
+
 public class MainView implements View<MainViewModel> {
 
     private final BorderPane root;
@@ -17,11 +19,13 @@ public class MainView implements View<MainViewModel> {
 
     private final MyAccountsView myAccountsView;
     private final MyBudgetView myBudgetView;
+    private final ScheduledTransactionsView scheduledTransactionsView;
 
     public MainView() {
         this.root = new BorderPane();
         this.myAccountsView = new MyAccountsView();
         this.myBudgetView = new MyBudgetView();
+        this.scheduledTransactionsView = new ScheduledTransactionsView();
         initializeUI();
     }
 
@@ -36,7 +40,11 @@ public class MainView implements View<MainViewModel> {
         budgetTab.setClosable(false);
         budgetTab.setContent(myBudgetView.getRoot());
 
-        tabPane.getTabs().addAll(accountsTab, budgetTab);
+        // Scheduled Transactions Tab
+        Tab scheduledTab = new Tab("Scheduled Transactions", scheduledTransactionsView.getRoot());
+        scheduledTab.setClosable(false);
+
+        tabPane.getTabs().addAll(accountsTab, budgetTab, scheduledTab);
 
         root.setCenter(tabPane);
     }
@@ -48,6 +56,7 @@ public class MainView implements View<MainViewModel> {
         // Bind child views
         myAccountsView.bind(viewModel.getMyAccountsViewModel());
         myBudgetView.bind(viewModel.getMyBudgetViewModel());
+        scheduledTransactionsView.bind(viewModel.getScheduledTransactionsViewModel());
     }
 
     @Override

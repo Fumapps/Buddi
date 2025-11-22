@@ -14,6 +14,7 @@ public class MainViewModel extends ViewModel {
     private Document document;
     private MyAccountsViewModel myAccountsViewModel;
     private org.homeunix.thecave.buddi.view.mvvm.mybudget.MyBudgetViewModel myBudgetViewModel;
+    private org.homeunix.thecave.buddi.view.mvvm.scheduled.ScheduledTransactionsViewModel scheduledTransactionsViewModel;
 
     public StringProperty titleProperty() {
         return title;
@@ -35,6 +36,10 @@ public class MainViewModel extends ViewModel {
         return myBudgetViewModel;
     }
 
+    public org.homeunix.thecave.buddi.view.mvvm.scheduled.ScheduledTransactionsViewModel getScheduledTransactionsViewModel() {
+        return scheduledTransactionsViewModel;
+    }
+
     @Override
     public void initialize() {
         super.initialize();
@@ -43,6 +48,8 @@ public class MainViewModel extends ViewModel {
             this.document = ModelFactory.createDocument();
             this.myAccountsViewModel = new MyAccountsViewModel(document);
             this.myBudgetViewModel = new org.homeunix.thecave.buddi.view.mvvm.mybudget.MyBudgetViewModel(document);
+            this.scheduledTransactionsViewModel = new org.homeunix.thecave.buddi.view.mvvm.scheduled.ScheduledTransactionsViewModel(
+                    document);
         } catch (Exception e) {
             e.printStackTrace();
             // TODO: Handle error gracefully (show alert)
