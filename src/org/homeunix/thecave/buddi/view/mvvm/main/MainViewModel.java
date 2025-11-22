@@ -15,6 +15,7 @@ public class MainViewModel extends ViewModel {
     private MyAccountsViewModel myAccountsViewModel;
     private org.homeunix.thecave.buddi.view.mvvm.mybudget.MyBudgetViewModel myBudgetViewModel;
     private org.homeunix.thecave.buddi.view.mvvm.scheduled.ScheduledTransactionsViewModel scheduledTransactionsViewModel;
+    private org.homeunix.thecave.buddi.view.mvvm.reports.ReportsViewModel reportsViewModel;
 
     public StringProperty titleProperty() {
         return title;
@@ -40,6 +41,10 @@ public class MainViewModel extends ViewModel {
         return scheduledTransactionsViewModel;
     }
 
+    public org.homeunix.thecave.buddi.view.mvvm.reports.ReportsViewModel getReportsViewModel() {
+        return reportsViewModel;
+    }
+
     @Override
     public void initialize() {
         super.initialize();
@@ -50,6 +55,7 @@ public class MainViewModel extends ViewModel {
             this.myBudgetViewModel = new org.homeunix.thecave.buddi.view.mvvm.mybudget.MyBudgetViewModel(document);
             this.scheduledTransactionsViewModel = new org.homeunix.thecave.buddi.view.mvvm.scheduled.ScheduledTransactionsViewModel(
                     document);
+            this.reportsViewModel = new org.homeunix.thecave.buddi.view.mvvm.reports.ReportsViewModel(document);
         } catch (Exception e) {
             e.printStackTrace();
             // TODO: Handle error gracefully (show alert)
