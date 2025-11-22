@@ -56,6 +56,9 @@ public class TransactionView implements View<TransactionViewModel> {
         dateCol.setCellValueFactory(
                 p -> new ReadOnlyStringWrapper(TextFormatter.getFormattedDate(p.getValue().getDate())));
 
+        TableColumn<Transaction, String> numberCol = new TableColumn<>("No.");
+        numberCol.setCellValueFactory(p -> new ReadOnlyStringWrapper(p.getValue().getNumber()));
+
         TableColumn<Transaction, String> descCol = new TableColumn<>("Description");
         descCol.setCellValueFactory(p -> new ReadOnlyStringWrapper(p.getValue().getDescription()));
 
@@ -69,8 +72,27 @@ public class TransactionView implements View<TransactionViewModel> {
         TableColumn<Transaction, String> toCol = new TableColumn<>("To");
         toCol.setCellValueFactory(p -> new ReadOnlyStringWrapper(p.getValue().getTo().getFullName()));
 
+        TableColumn<Transaction, String> memoCol = new TableColumn<>("Memo");
+        memoCol.setCellValueFactory(p -> new ReadOnlyStringWrapper(p.getValue().getMemo()));
+
+        TableColumn<Transaction, String> clearedCol = new TableColumn<>("C");
+        clearedCol.setCellValueFactory(p -> {
+            Transaction t = p.getValue();
+            boolean isCleared = t.getFrom().equals(viewModel.getAccount()) ? t.isClearedFrom() : t.isClearedTo();
+            return new ReadOnlyStringWrapper(isCleared ? "X" : "");
+        });
+
+        TableColumn<Transaction, String> reconciledCol = new TableColumn<>("R");
+        reconciledCol.setCellValueFactory(p -> {
+            Transaction t = p.getValue();
+            boolean isReconciled = t.getFrom().equals(viewModel.getAccount()) ? t.isReconciledFrom()
+                    : t.isReconciledTo();
+            return new ReadOnlyStringWrapper(isReconciled ? "X" : "");
+        });
+
         @SuppressWarnings("unchecked")
-        TableColumn<Transaction, ?>[] columns = new TableColumn[] { dateCol, descCol, amountCol, fromCol, toCol };
+        TableColumn<Transaction, ?>[] columns = new TableColumn[] { dateCol, numberCol, descCol, amountCol, fromCol,
+                toCol, memoCol, clearedCol, reconciledCol };
         table.getColumns().addAll(columns);
 
         @SuppressWarnings("deprecation")
