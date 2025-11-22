@@ -3,7 +3,9 @@ package org.homeunix.thecave.buddi.view.mvvm.mybudget;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.geometry.Insets;
 import javafx.scene.Parent;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TreeItem;
@@ -99,6 +101,60 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
         bottomPanel.setStyle("-fx-background-color: #e0e0e0;");
         bottomPanel.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
         bottomPanel.getChildren().add(netIncomeLabel);
+
+        // Context Menu
+        javafx.scene.control.ContextMenu contextMenu = new javafx.scene.control.ContextMenu();
+        javafx.scene.control.MenuItem newItem = new javafx.scene.control.MenuItem("New Budget Category");
+        javafx.scene.control.MenuItem editItem = new javafx.scene.control.MenuItem("Edit");
+        javafx.scene.control.MenuItem deleteItem = new javafx.scene.control.MenuItem("Delete");
+
+        newItem.setOnAction(e -> {
+            BudgetCategory selected = treeTableView.getSelectionModel().getSelectedItem() != null
+                    ? treeTableView.getSelectionModel().getSelectedItem().getValue()
+                    : null;
+            viewModel.createNewCategory(selected);
+        });
+
+        editItem.setOnAction(e -> {
+            TreeItem<BudgetCategory> selectedItem = treeTableView.getSelectionModel().getSelectedItem();
+            if (selectedItem != null) {
+                viewModel.editCategory(selectedItem.getValue());
+            }
+        });
+
+        deleteItem.setOnAction(e -> {
+            TreeItem<BudgetCategory> selectedItem = treeTableView.getSelectionModel().getSelectedItem();
+            if (selectedItem != null) {
+                Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                alert.setTitle("Delete Budget Category");
+                alert.setHeaderText(null);
+                alert.setContentText("Are you sure you want to delete " + selectedItem.getValue().getName() + "?");
+                alert.showAndWait().ifPresent(response -> {
+                    if (response == ButtonType.OK) {
+                        viewModel.deleteCategory(selectedItem.getValue());
+                    }
+                });
+            }
+        });
+
+        contextMenu.getItems().addAll(newItem, editItem, deleteItem);
+        treeTableView.setContextMenu(contextMenu);
+
+        // Double click to edit
+        treeTableView.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2 && treeTableView.getSelectionModel().getSelectedItem() != null) {
+                // Check if clicking on amount column (which is editable) or name
+                // Actually, amount column has its own editor.
+                // Maybe double click on name should edit category properties?
+                // For now, let's stick to context menu for properties, and double click on
+                // amount for amount.
+                // But if we want double click on row to edit properties (if not on amount
+                // cell):
+                // It's a bit tricky with TreeTableView.
+                // Let's leave double click for now, as amount editing is handled by cell
+                // factory.
+            }
+        });
 
         root.setTop(topPanel);
         root.setCenter(treeTableView);

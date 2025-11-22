@@ -36,7 +36,8 @@ public class TransactionViewModel extends ViewModel {
     private final BooleanProperty reconciled = new SimpleBooleanProperty(false);
 
     // Available Sources for ComboBoxes
-    private final ObservableList<Source> availableSources = FXCollections.observableArrayList();
+    private final ObservableList<Source> fromSources = FXCollections.observableArrayList();
+    private final ObservableList<Source> toSources = FXCollections.observableArrayList();
 
     // Split Management
     private final ObservableList<TransactionSplit> fromSplits = FXCollections.observableArrayList();
@@ -77,7 +78,27 @@ public class TransactionViewModel extends ViewModel {
     }
 
     private void openSplitEditor(ObservableList<TransactionSplit> splits, String title) {
-        SplitTransactionView dialog = new SplitTransactionView(splits, availableSources);
+        // We need to pass all available sources to the split editor,
+        // or maybe specific ones?
+        // SplitTransactionView likely uses a single list.
+        // For now, let's pass a combined list or just one of them if it doesn't matter.
+        // Actually, splits usually allow any source?
+        // No, From Split means the transaction is FROM Split, so the splits are the
+        // "From" side?
+        // Wait, if From is Split, the splits define where the money comes FROM.
+        // So the splits should contain Accounts or Income Categories?
+        // If To is Split, the splits define where money goes TO (Accounts or Expense
+        // Categories).
+
+        // Let's combine them for now for the split editor, or pass the appropriate
+        // list.
+        // But SplitTransactionView constructor takes one list.
+        // Let's create a combined list for the split editor.
+        ObservableList<Source> allSources = FXCollections.observableArrayList();
+        allSources.addAll(document.getAccounts());
+        allSources.addAll(document.getBudgetCategories());
+
+        SplitTransactionView dialog = new SplitTransactionView(splits, allSources);
         dialog.setTitle(title);
         dialog.showAndWait();
     }
@@ -100,10 +121,26 @@ public class TransactionViewModel extends ViewModel {
 
     private void loadSources() {
         if (document != null) {
-            availableSources.clear();
-            availableSources.add(SPLIT_SOURCE); // Add Split option
-            availableSources.addAll(document.getAccounts());
-            availableSources.addAll(document.getBudgetCategories());
+            fromSources.clear();
+            toSources.clear();
+
+            fromSources.add(SPLIT_SOURCE);
+            toSources.add(SPLIT_SOURCE);
+
+            // Accounts are valid for both
+            fromSources.addAll(document.getAccounts());
+            toSources.addAll(document.getAccounts());
+
+            // Budget Categories:
+            // From: Income Categories
+            // To: Expense Categories
+            for (BudgetCategory bc : document.getBudgetCategories()) {
+                if (bc.isIncome()) {
+                    fromSources.add(bc);
+                } else {
+                    toSources.add(bc);
+                }
+            }
         }
     }
 
@@ -191,6 +228,18 @@ public class TransactionViewModel extends ViewModel {
             return "Destination (To) cannot be empty.";
         }
 
+        // Validate Category Types
+        if (from.get() instanceof BudgetCategory) {
+            if (!((BudgetCategory) from.get()).isIncome()) {
+                return "Source must be an Income Category (or Account).";
+            }
+        }
+        if (to.get() instanceof BudgetCategory) {
+            if (((BudgetCategory) to.get()).isIncome()) {
+                return "Destination must be an Expense Category (or Account).";
+            }
+        }
+
         long totalAmount = parseAmount(amount.get());
 
         // Validate Splits
@@ -254,12 +303,16 @@ public class TransactionViewModel extends ViewModel {
                 t.setToSplits(toSplits);
             }
 
-            if (t.getFrom().equals(account)) {
-                t.setClearedFrom(cleared.get());
-                t.setReconciledFrom(reconciled.get());
-            } else {
-                t.setClearedTo(cleared.get());
-                t.setReconciledTo(reconciled.get());
+            // NPE Protection: Check if getFrom() is null (should not be if logic is
+            // correct)
+            if (t.getFrom() != null) {
+                if (t.getFrom().equals(account)) {
+                    t.setClearedFrom(cleared.get());
+                    t.setReconciledFrom(reconciled.get());
+                } else {
+                    t.setClearedTo(cleared.get());
+                    t.setReconciledTo(reconciled.get());
+                }
             }
 
             if (isNew) {
@@ -346,8 +399,12 @@ public class TransactionViewModel extends ViewModel {
         return reconciled;
     }
 
-    public ObservableList<Source> getAvailableSources() {
-        return availableSources;
+    public ObservableList<Source> getFromSources() {
+        return fromSources;
+    }
+
+    public ObservableList<Source> getToSources() {
+        return toSources;
     }
 
     public Account getAccount() {

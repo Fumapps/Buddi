@@ -208,11 +208,11 @@ public class TransactionView implements View<TransactionViewModel> {
         clearedCheck.selectedProperty().bindBidirectional(viewModel.clearedProperty());
         reconciledCheck.selectedProperty().bindBidirectional(viewModel.reconciledProperty());
 
-        // ComboBoxes
-        fromCombo.setItems(viewModel.getAvailableSources());
+        // Bind ComboBoxes
+        fromCombo.setItems(viewModel.getFromSources());
         fromCombo.valueProperty().bindBidirectional(viewModel.fromProperty());
 
-        toCombo.setItems(viewModel.getAvailableSources());
+        toCombo.setItems(viewModel.getToSources());
         toCombo.valueProperty().bindBidirectional(viewModel.toProperty());
 
         // Buttons

@@ -143,4 +143,51 @@ public class MyBudgetViewModel extends ViewModel {
             }
         }
     }
+
+    public void createNewCategory(BudgetCategory parent) {
+        org.homeunix.thecave.buddi.view.mvvm.mybudget.BudgetCategoryEditorDialog dialog = new org.homeunix.thecave.buddi.view.mvvm.mybudget.BudgetCategoryEditorDialog(
+                getBudgetCategories(), getBudgetCategoryTypes(), null);
+
+        // Pre-select parent if provided
+        // (We might need to expose a way to set parent in dialog, or pass it in
+        // constructor)
+        // For now, let's just open it.
+
+        java.util.Optional<BudgetCategory> result = dialog.showAndWait();
+        result.ifPresent(category -> {
+            try {
+                if (parent != null) {
+                    category.setParent(parent);
+                }
+                document.addBudgetCategory(category);
+                firePropertyChange(PROPERTY_BUDGET_TREE_CHANGED, null, System.currentTimeMillis());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    public void editCategory(BudgetCategory category) {
+        if (category == null)
+            return;
+
+        org.homeunix.thecave.buddi.view.mvvm.mybudget.BudgetCategoryEditorDialog dialog = new org.homeunix.thecave.buddi.view.mvvm.mybudget.BudgetCategoryEditorDialog(
+                getBudgetCategories(), getBudgetCategoryTypes(), category);
+
+        java.util.Optional<BudgetCategory> result = dialog.showAndWait();
+        result.ifPresent(updatedCategory -> {
+            firePropertyChange(PROPERTY_BUDGET_TREE_CHANGED, null, System.currentTimeMillis());
+        });
+    }
+
+    public void deleteCategory(BudgetCategory category) {
+        if (category == null)
+            return;
+        try {
+            document.removeBudgetCategory(category);
+            firePropertyChange(PROPERTY_BUDGET_TREE_CHANGED, null, System.currentTimeMillis());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
