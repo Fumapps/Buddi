@@ -59,7 +59,7 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
         periodTypeCombo.setConverter(new StringConverter<BudgetCategoryType>() {
             @Override
             public String toString(BudgetCategoryType object) {
-                return object != null ? object.getName() : "";
+                return object != null ? TextFormatter.getTranslation(object.getName()) : "";
             }
 
             @Override
