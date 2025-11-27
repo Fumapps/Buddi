@@ -130,4 +130,21 @@ public class MainViewModel extends ViewModel {
             setTitle("Buddi - [Untitled]");
         }
     }
+
+    public boolean isChanged() {
+        return document != null && document.isChanged();
+    }
+
+    /**
+     * Request to close the application/window.
+     * 
+     * @return true if the window can be closed, false if the close should be
+     *         aborted.
+     */
+    public boolean requestClose() {
+        if (isChanged()) {
+            return false; // Signal that we need a prompt
+        }
+        return true; // Clean, can close
+    }
 }

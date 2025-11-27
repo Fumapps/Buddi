@@ -85,7 +85,9 @@ public class BudgetCategoryEditorDialog extends Dialog<BudgetCategory> {
         periodTypeCombo.setConverter(new StringConverter<BudgetCategoryType>() {
             @Override
             public String toString(BudgetCategoryType object) {
-                return object != null ? object.getName() : "";
+                return object != null
+                        ? org.homeunix.thecave.buddi.plugin.api.util.TextFormatter.getTranslation(object.getName())
+                        : "";
             }
 
             @Override

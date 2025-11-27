@@ -110,6 +110,42 @@ public class MainView implements View<MainViewModel> {
         // Bind title
         if (root.getScene() != null && root.getScene().getWindow() instanceof Stage) {
             ((Stage) root.getScene().getWindow()).titleProperty().bind(viewModel.titleProperty());
+
+            // Handle window close request
+            ((Stage) root.getScene().getWindow()).setOnCloseRequest(event -> {
+                if (!viewModel.requestClose()) {
+                    // Dirty state: prompt user
+                    javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                            javafx.scene.control.Alert.AlertType.CONFIRMATION);
+                    alert.setTitle("Unsaved Changes");
+                    alert.setHeaderText("You have unsaved changes.");
+                    alert.setContentText("Do you want to save your changes before closing?");
+
+                    javafx.scene.control.ButtonType buttonTypeSave = new javafx.scene.control.ButtonType("Save");
+                    javafx.scene.control.ButtonType buttonTypeDontSave = new javafx.scene.control.ButtonType(
+                            "Don't Save");
+                    javafx.scene.control.ButtonType buttonTypeCancel = new javafx.scene.control.ButtonType("Cancel",
+                            javafx.scene.control.ButtonBar.ButtonData.CANCEL_CLOSE);
+
+                    alert.getButtonTypes().setAll(buttonTypeSave, buttonTypeDontSave, buttonTypeCancel);
+
+                    java.util.Optional<javafx.scene.control.ButtonType> result = alert.showAndWait();
+                    if (result.isPresent()) {
+                        if (result.get() == buttonTypeSave) {
+                            viewModel.save();
+                            // Proceed with close
+                        } else if (result.get() == buttonTypeDontSave) {
+                            // Proceed with close (discard changes)
+                        } else {
+                            // Cancel close
+                            event.consume();
+                        }
+                    } else {
+                        // Dialog closed without selection (treat as cancel)
+                        event.consume();
+                    }
+                }
+            });
         }
 
         // Bind child views to ViewModel properties
