@@ -192,12 +192,7 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
         viewModel.addPropertyChangeListener(evt -> {
             if (MyBudgetViewModel.PROPERTY_BUDGET_TREE_CHANGED.equals(evt.getPropertyName())) {
                 javafx.application.Platform.runLater(() -> {
-                    treeTableView.refresh(); // Refresh cells to update amounts
-                    // If structure changed, we might need to re-populate, but usually amounts
-                    // change
-                    // If categories added/removed, we need populateTree().
-                    // For now, let's assume structure is stable or we can re-populate if needed.
-                    // But refresh() is enough for amount updates.
+                    populateTree(); // Re-populate tree to reflect structural changes (add/remove)
                 });
             }
         });

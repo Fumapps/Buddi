@@ -14,6 +14,7 @@ import org.homeunix.thecave.buddi.model.BudgetCategory;
 import org.homeunix.thecave.buddi.model.BudgetCategoryType;
 import org.homeunix.thecave.buddi.model.Document;
 import org.homeunix.thecave.buddi.model.impl.FilteredLists;
+import org.homeunix.thecave.buddi.model.impl.ModelFactory;
 import org.homeunix.thecave.buddi.model.swing.MyBudgetTreeTableModel;
 import org.homeunix.thecave.buddi.plugin.api.util.TextFormatter;
 
@@ -22,7 +23,8 @@ import ca.digitalcave.moss.application.document.DocumentChangeListener;
 
 /**
  * ViewModel backing the MyBudgetPanel Swing view.
- * Manages period selection, net income formatting, and exposes observable state for the view.
+ * Manages period selection, net income formatting, and exposes observable state
+ * for the view.
  */
 public class MyBudgetViewModel extends ObservableViewModel {
 	public static final String PROPERTY_NET_INCOME_TEXT = "netIncomeText";
@@ -73,16 +75,16 @@ public class MyBudgetViewModel extends ObservableViewModel {
 		}
 		Date normalized = getSelectedBudgetPeriodType().getStartOfBudgetPeriod(date);
 		Date current = treeTableModel.getSelectedDate();
-		
+
 		boolean dateChanged = current == null || !current.equals(normalized);
-		
+
 		if (dateChanged) {
 			treeTableModel.setSelectedDate(normalized);
 			firePropertyChange(PROPERTY_SELECTED_DATE_CHANGED, current, normalized);
 		}
-		
+
 		periodDateMap.put(periodKey(getSelectedBudgetPeriodType()), normalized);
-		
+
 		// Always refresh tree and net income, even if date didn't change,
 		// because underlying transaction data may have changed
 		notifyTreeStructureChanged();
@@ -109,8 +111,7 @@ public class MyBudgetViewModel extends ObservableViewModel {
 		Date restoredDate = periodDateMap.get(periodKey(periodType));
 		if (restoredDate != null) {
 			treeTableModel.setSelectedDate(restoredDate);
-		}
-		else {
+		} else {
 			Date fallback = periodType.getStartOfBudgetPeriod(treeTableModel.getSelectedDate());
 			treeTableModel.setSelectedDate(fallback);
 			periodDateMap.put(periodKey(periodType), fallback);
@@ -126,6 +127,65 @@ public class MyBudgetViewModel extends ObservableViewModel {
 		if (category != null) {
 			category.setExpanded(expanded);
 		}
+	}
+
+	public void createNewCategory(BudgetCategory parent) {
+		// Show dialog
+		org.homeunix.thecave.buddi.view.mvvm.mybudget.BudgetCategoryEditorDialog dialog = new org.homeunix.thecave.buddi.view.mvvm.mybudget.BudgetCategoryEditorDialog(
+				getBudgetCategories(), getBudgetCategoryTypes(), null);
+
+		// Pre-select parent if provided
+		// Note: Dialog constructor logic might need adjustment if we want to pass
+		// parent directly,
+		// but for now let's just show it.
+		// Actually, the dialog logic I saw earlier takes (parents, types, category).
+		// It doesn't take a 'default parent' argument for new creation, but we can
+		// handle that later if needed.
+
+		java.util.Optional<BudgetCategory> result = dialog.showAndWait();
+
+		result.ifPresent(category -> {
+			try {
+				if (parent != null) {
+					category.setParent(parent);
+				}
+				document.addBudgetCategory(category);
+				refresh();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		});
+	}
+
+	public void editCategory(BudgetCategory category) {
+		if (category == null)
+			return;
+
+		org.homeunix.thecave.buddi.view.mvvm.mybudget.BudgetCategoryEditorDialog dialog = new org.homeunix.thecave.buddi.view.mvvm.mybudget.BudgetCategoryEditorDialog(
+				getBudgetCategories(), getBudgetCategoryTypes(), category);
+
+		java.util.Optional<BudgetCategory> result = dialog.showAndWait();
+		result.ifPresent(c -> refresh());
+	}
+
+	public void deleteCategory(BudgetCategory category) {
+		if (category == null)
+			return;
+		try {
+			document.removeBudgetCategory(category);
+			refresh();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public List<BudgetCategoryType> getBudgetCategoryTypes() {
+		List<BudgetCategoryType> types = new LinkedList<BudgetCategoryType>();
+		for (org.homeunix.thecave.buddi.i18n.keys.BudgetCategoryTypes type : org.homeunix.thecave.buddi.i18n.keys.BudgetCategoryTypes
+				.values()) {
+			types.add(ModelFactory.getBudgetCategoryType(type));
+		}
+		return types;
 	}
 
 	public List<BudgetCategory> getSelectedBudgetCategories(Object[] rowValues) {
