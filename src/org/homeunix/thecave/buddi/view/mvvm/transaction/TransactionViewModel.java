@@ -9,6 +9,7 @@ import org.homeunix.thecave.buddi.plugin.api.exception.InvalidValueException;
 import org.homeunix.thecave.buddi.plugin.api.exception.ModelException;
 import org.homeunix.thecave.buddi.plugin.api.util.TextFormatter;
 import org.homeunix.thecave.buddi.util.Formatter;
+import org.homeunix.thecave.buddi.view.mvvm.DialogService;
 import org.homeunix.thecave.buddi.view.mvvm.ViewModel;
 
 import java.util.Date;
@@ -19,6 +20,7 @@ public class TransactionViewModel extends ViewModel {
 
     private final Document document;
     private final Account account; // The account we are viewing transactions for
+    private final DialogService dialogService;
 
     // List of transactions for the table
     private final ObservableList<Transaction> transactions = FXCollections.observableArrayList();
@@ -45,9 +47,10 @@ public class TransactionViewModel extends ViewModel {
 
     public static final Source SPLIT_SOURCE = new SplitSource();
 
-    public TransactionViewModel(Document document, Account account) {
+    public TransactionViewModel(Document document, Account account, DialogService dialogService) {
         this.document = document;
         this.account = account;
+        this.dialogService = dialogService;
 
         loadTransactions();
         loadSources();
@@ -78,22 +81,9 @@ public class TransactionViewModel extends ViewModel {
     }
 
     private void openSplitEditor(ObservableList<TransactionSplit> splits, String title) {
-        // We need to pass all available sources to the split editor,
-        // or maybe specific ones?
-        // SplitTransactionView likely uses a single list.
-        // For now, let's pass a combined list or just one of them if it doesn't matter.
-        // Actually, splits usually allow any source?
-        // No, From Split means the transaction is FROM Split, so the splits are the
-        // "From" side?
-        // Wait, if From is Split, the splits define where the money comes FROM.
-        // So the splits should contain Accounts or Income Categories?
-        // If To is Split, the splits define where money goes TO (Accounts or Expense
-        // Categories).
-
-        // Let's combine them for now for the split editor, or pass the appropriate
-        // list.
-        // But SplitTransactionView constructor takes one list.
-        // Let's create a combined list for the split editor.
+        // TODO: Use DialogService for Split Editor as well
+        // For now, we keep the direct instantiation or move it to DialogService later
+        // Let's assume for this step we focus on Alerts
         ObservableList<Source> allSources = FXCollections.observableArrayList();
         allSources.addAll(document.getAccounts());
         allSources.addAll(document.getBudgetCategories());
@@ -200,16 +190,19 @@ public class TransactionViewModel extends ViewModel {
     }
 
     public void delete() {
-        try {
-            Transaction t = selectedTransaction.get();
-            if (t != null) {
-                document.removeTransaction(t);
-                transactions.remove(t);
-                clearEditor();
-                account.updateBalance();
+        Transaction t = selectedTransaction.get();
+        if (t != null) {
+            if (dialogService.showConfirmation("Delete Transaction",
+                    "Are you sure you want to delete this transaction?")) {
+                try {
+                    document.removeTransaction(t);
+                    transactions.remove(t);
+                    clearEditor();
+                    account.updateBalance();
+                } catch (ModelException e) {
+                    dialogService.showError("Error deleting transaction", e.getMessage());
+                }
             }
-        } catch (ModelException e) {
-            e.printStackTrace();
         }
     }
 
@@ -268,8 +261,7 @@ public class TransactionViewModel extends ViewModel {
         try {
             String validationError = validate();
             if (validationError != null) {
-                // View should handle this, but for now we return false to indicate failure
-                // In a pure MVVM way, we might have a validationError property
+                dialogService.showError("Validation Error", validationError);
                 return false;
             }
 
@@ -329,10 +321,10 @@ public class TransactionViewModel extends ViewModel {
             return true;
 
         } catch (InvalidValueException e) {
-            e.printStackTrace();
+            dialogService.showError("Error saving transaction", e.getMessage());
             return false;
         } catch (Exception e) {
-            e.printStackTrace();
+            dialogService.showError("Error saving transaction", e.getMessage());
             return false;
         }
     }

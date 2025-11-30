@@ -24,7 +24,8 @@ public class Buddi extends Application {
 
 	@Override
 	public void start(Stage primaryStage) throws Exception {
-		MainViewModel viewModel = new MainViewModel();
+		org.homeunix.thecave.buddi.view.mvvm.DialogService dialogService = new org.homeunix.thecave.buddi.view.mvvm.JavaFXDialogService();
+		MainViewModel viewModel = new MainViewModel(dialogService);
 		MainView view = new MainView();
 
 		viewModel.initialize();

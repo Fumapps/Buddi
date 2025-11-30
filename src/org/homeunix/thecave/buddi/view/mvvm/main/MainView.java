@@ -34,6 +34,11 @@ public class MainView implements View<MainViewModel> {
         this.scheduledTransactionsView = new ScheduledTransactionsView();
         this.reportsView = new ReportsView();
         initializeUI();
+
+        // In a real app, this would be done by a DI container or the Application class
+        // For now, we do it here to bootstrap the MVVM graph
+        org.homeunix.thecave.buddi.view.mvvm.DialogService dialogService = new org.homeunix.thecave.buddi.view.mvvm.JavaFXDialogService();
+        bind(new MainViewModel(dialogService));
     }
 
     private void initializeUI() {

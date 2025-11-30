@@ -7,6 +7,7 @@ import javafx.collections.ObservableList;
 import org.homeunix.thecave.buddi.model.Document;
 import org.homeunix.thecave.buddi.model.ScheduledTransaction;
 import org.homeunix.thecave.buddi.model.Source;
+import org.homeunix.thecave.buddi.view.mvvm.DialogService;
 import org.homeunix.thecave.buddi.view.mvvm.ViewModel;
 
 import java.util.List;
@@ -14,11 +15,13 @@ import java.util.List;
 public class ScheduledTransactionsViewModel extends ViewModel {
 
     private final Document document;
+    private final DialogService dialogService;
     private final ObservableList<ScheduledTransaction> scheduledTransactions = FXCollections.observableArrayList();
     private final ObjectProperty<ScheduledTransaction> selectedTransaction = new SimpleObjectProperty<>();
 
-    public ScheduledTransactionsViewModel(Document document) {
+    public ScheduledTransactionsViewModel(Document document, DialogService dialogService) {
         this.document = document;
+        this.dialogService = dialogService;
         loadScheduledTransactions();
     }
 
@@ -39,40 +42,42 @@ public class ScheduledTransactionsViewModel extends ViewModel {
     public void deleteSelectedTransaction() {
         ScheduledTransaction t = selectedTransaction.get();
         if (t != null) {
-            try {
-                document.removeScheduledTransaction(t);
-                scheduledTransactions.remove(t);
-                selectedTransaction.set(null);
-            } catch (Exception e) {
-                e.printStackTrace();
+            if (dialogService.showConfirmation("Delete Scheduled Transaction",
+                    "Are you sure you want to delete this scheduled transaction?")) {
+                try {
+                    document.removeScheduledTransaction(t);
+                    scheduledTransactions.remove(t);
+                    selectedTransaction.set(null);
+                } catch (Exception e) {
+                    dialogService.showError("Error deleting transaction", e.getMessage());
+                }
             }
         }
     }
 
     public void createNewTransaction() {
-        ScheduledTransactionEditorDialog dialog = new ScheduledTransactionEditorDialog(document, null);
-        dialog.showAndWait().ifPresent(t -> {
-            try {
-                document.addScheduledTransaction(t);
-                scheduledTransactions.add(t);
-                selectedTransaction.set(t);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+        dialogService.showScheduledTransactionEditor(document, null)
+                .ifPresent(t -> {
+                    try {
+                        document.addScheduledTransaction(t);
+                        scheduledTransactions.add(t);
+                        selectedTransaction.set(t);
+                    } catch (Exception e) {
+                        dialogService.showError("Error creating transaction", e.getMessage());
+                    }
+                });
     }
 
     public void editSelectedTransaction() {
         ScheduledTransaction t = selectedTransaction.get();
         if (t != null) {
-            ScheduledTransactionEditorDialog dialog = new ScheduledTransactionEditorDialog(document, t);
-            dialog.showAndWait().ifPresent(updated -> {
-                // Refresh list item to update view
-                int index = scheduledTransactions.indexOf(t);
-                if (index >= 0) {
-                    scheduledTransactions.set(index, updated);
-                }
-            });
+            dialogService.showScheduledTransactionEditor(document, t)
+                    .ifPresent(updated -> {
+                        int index = scheduledTransactions.indexOf(t);
+                        if (index >= 0) {
+                            scheduledTransactions.set(index, updated);
+                        }
+                    });
         }
     }
 

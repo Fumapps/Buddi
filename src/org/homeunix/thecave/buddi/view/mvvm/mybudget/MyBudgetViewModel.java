@@ -1,193 +1,240 @@
 package org.homeunix.thecave.buddi.view.mvvm.mybudget;
 
+import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import org.homeunix.thecave.buddi.i18n.keys.BudgetCategoryTypes;
 import org.homeunix.thecave.buddi.model.BudgetCategory;
 import org.homeunix.thecave.buddi.model.BudgetCategoryType;
 import org.homeunix.thecave.buddi.model.Document;
 import org.homeunix.thecave.buddi.model.impl.FilteredLists;
 import org.homeunix.thecave.buddi.model.impl.ModelFactory;
-import org.homeunix.thecave.buddi.plugin.api.exception.InvalidValueException;
 import org.homeunix.thecave.buddi.plugin.api.util.TextFormatter;
+import org.homeunix.thecave.buddi.view.mvvm.DialogService;
 import org.homeunix.thecave.buddi.view.mvvm.ViewModel;
 
+import ca.digitalcave.moss.application.document.DocumentChangeEvent;
+import ca.digitalcave.moss.application.document.DocumentChangeListener;
+
 import java.util.Date;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 public class MyBudgetViewModel extends ViewModel {
 
-    public static final String PROPERTY_BUDGET_TREE_CHANGED = "budgetTreeChanged";
+	private final Document document;
+	private final DialogService dialogService;
+	private final DocumentChangeListener documentListener;
 
-    private final Document document;
-    private final ObjectProperty<BudgetCategoryType> selectedPeriodType = new SimpleObjectProperty<>();
-    private final ObjectProperty<Date> selectedDate = new SimpleObjectProperty<>();
-    private final StringProperty netIncomeText = new SimpleStringProperty();
+	// Properties
+	private final ObjectProperty<BudgetCategoryType> selectedPeriodType = new SimpleObjectProperty<>();
+	private final ObjectProperty<Date> selectedDate = new SimpleObjectProperty<>();
+	private final StringProperty netIncomeText = new SimpleStringProperty();
 
-    private final Map<String, Date> periodDateMap = new HashMap<>();
+	// Data for View
+	private final ObservableList<BudgetCategory> budgetCategories = FXCollections.observableArrayList();
 
-    public MyBudgetViewModel(Document document) {
-        this.document = document;
+	public MyBudgetViewModel(Document document, DialogService dialogService) {
+		this.document = document;
+		this.dialogService = dialogService;
 
-        // Initialize with defaults (similar to Swing implementation)
-        // We'll need to fetch available types. For now, let's assume we can get them or
-        // set a default later.
-        // Ideally, we should set it to the preference or the first available type.
+		this.documentListener = new DocumentChangeListener() {
+			@Override
+			public void documentChange(DocumentChangeEvent event) {
+				refresh();
+			}
+		};
+		this.document.addDocumentChangeListener(this.documentListener);
 
-        // Listeners for property changes to update net income and notify view
-        selectedPeriodType.addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                updateDateForPeriodType(newVal);
-                updateNetIncome();
-                firePropertyChange(PROPERTY_BUDGET_TREE_CHANGED, null, System.currentTimeMillis());
-            }
-        });
+		// Initialize defaults
+		this.selectedPeriodType.addListener((obs, oldVal, newVal) -> {
+			updateDateForPeriod(newVal);
+			refresh();
+		});
 
-        selectedDate.addListener((obs, oldVal, newVal) -> {
-            if (newVal != null && selectedPeriodType.get() != null) {
-                periodDateMap.put(periodKey(selectedPeriodType.get()), newVal);
-                updateNetIncome();
-                firePropertyChange(PROPERTY_BUDGET_TREE_CHANGED, null, System.currentTimeMillis());
-            }
-        });
-    }
+		this.selectedDate.addListener((obs, oldVal, newVal) -> {
+			refresh();
+		});
 
-    public ObjectProperty<BudgetCategoryType> selectedPeriodTypeProperty() {
-        return selectedPeriodType;
-    }
+		// Set initial period type (e.g., Month)
+		List<BudgetCategoryType> types = getBudgetCategoryTypes();
+		if (!types.isEmpty()) {
+			// Default to Month if available, else first one
+			BudgetCategoryType month = null;
+			for (BudgetCategoryType t : types) {
+				if (BudgetCategoryTypes.BUDGET_CATEGORY_TYPE_MONTH.toString().equals(t.getName())) {
+					month = t;
+					break;
+				}
+			}
+			setSelectedPeriodType(month != null ? month : types.get(0));
+		}
 
-    public ObjectProperty<Date> selectedDateProperty() {
-        return selectedDate;
-    }
+		// Set initial date
+		setSelectedDate(new Date());
 
-    public StringProperty netIncomeTextProperty() {
-        return netIncomeText;
-    }
+		refresh();
+	}
 
-    public List<BudgetCategory> getBudgetCategories() {
-        return document.getBudgetCategories();
-    }
+	private void updateDateForPeriod(BudgetCategoryType type) {
+		if (type == null)
+			return;
+		Date current = getSelectedDate();
+		if (current == null)
+			current = new Date();
+		setSelectedDate(type.getStartOfBudgetPeriod(current));
+	}
 
-    public List<BudgetCategoryType> getBudgetCategoryTypes() {
-        List<BudgetCategoryType> types = new LinkedList<>();
-        for (org.homeunix.thecave.buddi.i18n.keys.BudgetCategoryTypes key : org.homeunix.thecave.buddi.i18n.keys.BudgetCategoryTypes
-                .values()) {
-            types.add(ModelFactory.getBudgetCategoryType(key.toString()));
-        }
-        return types;
-    }
+	public void refresh() {
+		Platform.runLater(() -> {
+			updateBudgetCategories();
+			updateNetIncomeText();
+		});
+	}
 
-    private void updateDateForPeriodType(BudgetCategoryType type) {
-        Date restoredDate = periodDateMap.get(periodKey(type));
-        if (restoredDate != null) {
-            selectedDate.set(restoredDate);
-        } else {
-            // Default to current date normalized for the period
-            Date current = selectedDate.get();
-            if (current == null)
-                current = new Date();
-            selectedDate.set(type.getStartOfBudgetPeriod(current));
-        }
-    }
+	private void updateBudgetCategories() {
+		// In a real implementation, we might want to be smarter about diffing the list
+		// to preserve expansion state if the View doesn't handle it.
+		// For now, reload all.
+		budgetCategories.setAll(document.getBudgetCategories());
+	}
 
-    private void updateNetIncome() {
-        long net = calculateBudgetedNetIncome();
-        // Strip HTML for JavaFX Label binding, or keep it if we use a WebView/TextFlow
-        // (but Label is better)
-        // The Swing one used HTML. We'll strip it here and handle styling in View if
-        // needed,
-        // but TextFormatter.getFormattedCurrency usually returns a string.
-        // If it returns HTML, we strip it.
-        String formatted = TextFormatter.getFormattedCurrency(net);
-        formatted = formatted.replaceAll("<[^>]+>", "");
-        netIncomeText.set("Net Income: " + formatted);
-    }
+	private void updateNetIncomeText() {
+		long budgetedNet = calculateBudgetedNetIncome();
+		// Format currency, remove HTML if present (TextFormatter might return HTML)
+		String formatted = TextFormatter.getFormattedCurrency(budgetedNet);
+		if (formatted.startsWith("<html>")) {
+			formatted = formatted.replaceAll("<[^>]+>", "");
+		}
+		netIncomeText.set(formatted);
+	}
 
-    private long calculateBudgetedNetIncome() {
-        BudgetCategoryType periodType = selectedPeriodType.get();
-        Date date = selectedDate.get();
-        if (periodType == null || date == null) {
-            return 0;
-        }
+	private long calculateBudgetedNetIncome() {
+		BudgetCategoryType periodType = getSelectedPeriodType();
+		Date date = getSelectedDate();
+		if (periodType == null || date == null) {
+			return 0;
+		}
 
-        long total = 0;
-        // We need to filter categories that match the period type
-        List<BudgetCategory> categories = new LinkedList<>(
-                new FilteredLists.BudgetCategoryListFilteredByPeriodType(document, periodType));
+		long total = 0;
+		// FilteredLists is a helper from Buddi model
+		List<BudgetCategory> categories = new LinkedList<BudgetCategory>(
+				new FilteredLists.BudgetCategoryListFilteredByPeriodType(document, periodType));
 
-        for (BudgetCategory category : categories) {
-            long amount = category.getAmount(date);
-            total += category.isIncome() ? amount : -amount;
-        }
-        return total;
-    }
+		for (BudgetCategory category : categories) {
+			long amount = category.getAmount(date);
+			total += category.isIncome() ? amount : -amount;
+		}
+		return total;
+	}
 
-    private String periodKey(BudgetCategoryType type) {
-        return type != null ? type.getName() : "";
-    }
+	// Actions
 
-    public void setBudgetAmount(BudgetCategory category, long amount) {
-        if (category != null && selectedDate.get() != null) {
-            try {
-                category.setAmount(selectedDate.get(), amount);
-                updateNetIncome();
-                // No need to fire tree changed if we bind properties correctly,
-                // but for now we might need to refresh if the view doesn't observe the category
-                // directly
-            } catch (InvalidValueException e) {
-                e.printStackTrace();
-            }
-        }
-    }
+	public void createNewCategory(BudgetCategory parent) {
+		dialogService.showBudgetCategoryEditor(getBudgetCategories(), getBudgetCategoryTypes(), null)
+				.ifPresent(newCategory -> {
+					try {
+						if (parent != null) {
+							newCategory.setParent(parent);
+						}
+						document.addBudgetCategory(newCategory);
+						// Document change listener will trigger refresh
+					} catch (Exception e) {
+						dialogService.showError("Error creating category", e.getMessage());
+					}
+				});
+	}
 
-    public void createNewCategory(BudgetCategory parent) {
-        org.homeunix.thecave.buddi.view.mvvm.mybudget.BudgetCategoryEditorDialog dialog = new org.homeunix.thecave.buddi.view.mvvm.mybudget.BudgetCategoryEditorDialog(
-                getBudgetCategories(), getBudgetCategoryTypes(), null);
+	public void editCategory(BudgetCategory category) {
+		if (category == null)
+			return;
+		dialogService.showBudgetCategoryEditor(getBudgetCategories(), getBudgetCategoryTypes(), category)
+				.ifPresent(updated -> {
+					// Document change listener will trigger refresh
+					// If the category object itself was mutated, we might need to force refresh
+					refresh();
+				});
+	}
 
-        // Pre-select parent if provided
-        // (We might need to expose a way to set parent in dialog, or pass it in
-        // constructor)
-        // For now, let's just open it.
+	public void deleteCategory(BudgetCategory category) {
+		if (category == null)
+			return;
+		if (dialogService.showConfirmation("Delete Category",
+				"Are you sure you want to delete " + category.getName() + "?")) {
+			try {
+				document.removeBudgetCategory(category);
+			} catch (Exception e) {
+				dialogService.showError("Error deleting category", e.getMessage());
+			}
+		}
+	}
 
-        java.util.Optional<BudgetCategory> result = dialog.showAndWait();
-        result.ifPresent(category -> {
-            try {
-                if (parent != null) {
-                    category.setParent(parent);
-                }
-                document.addBudgetCategory(category);
-                firePropertyChange(PROPERTY_BUDGET_TREE_CHANGED, null, System.currentTimeMillis());
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
-    }
+	public void setBudgetAmount(BudgetCategory category, long amount) {
+		if (category == null || getSelectedDate() == null)
+			return;
+		try {
+			category.setAmount(getSelectedDate(), amount);
+			refresh();
+		} catch (Exception e) {
+			dialogService.showError("Error setting amount", e.getMessage());
+		}
+	}
 
-    public void editCategory(BudgetCategory category) {
-        if (category == null)
-            return;
+	public void setBudgetCategoryExpanded(BudgetCategory category, boolean expanded) {
+		if (category != null) {
+			category.setExpanded(expanded);
+		}
+	}
 
-        org.homeunix.thecave.buddi.view.mvvm.mybudget.BudgetCategoryEditorDialog dialog = new org.homeunix.thecave.buddi.view.mvvm.mybudget.BudgetCategoryEditorDialog(
-                getBudgetCategories(), getBudgetCategoryTypes(), category);
+	// Getters / Property Accessors
 
-        java.util.Optional<BudgetCategory> result = dialog.showAndWait();
-        result.ifPresent(updatedCategory -> {
-            firePropertyChange(PROPERTY_BUDGET_TREE_CHANGED, null, System.currentTimeMillis());
-        });
-    }
+	public ObjectProperty<BudgetCategoryType> selectedPeriodTypeProperty() {
+		return selectedPeriodType;
+	}
 
-    public void deleteCategory(BudgetCategory category) {
-        if (category == null)
-            return;
-        try {
-            document.removeBudgetCategory(category);
-            firePropertyChange(PROPERTY_BUDGET_TREE_CHANGED, null, System.currentTimeMillis());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+	public BudgetCategoryType getSelectedPeriodType() {
+		return selectedPeriodType.get();
+	}
+
+	public void setSelectedPeriodType(BudgetCategoryType type) {
+		this.selectedPeriodType.set(type);
+	}
+
+	public ObjectProperty<Date> selectedDateProperty() {
+		return selectedDate;
+	}
+
+	public Date getSelectedDate() {
+		return selectedDate.get();
+	}
+
+	public void setSelectedDate(Date date) {
+		this.selectedDate.set(date);
+	}
+
+	public StringProperty netIncomeTextProperty() {
+		return netIncomeText;
+	}
+
+	public ObservableList<BudgetCategory> getBudgetCategories() {
+		return budgetCategories;
+	}
+
+	public List<BudgetCategoryType> getBudgetCategoryTypes() {
+		List<BudgetCategoryType> types = new LinkedList<>();
+		for (org.homeunix.thecave.buddi.i18n.keys.BudgetCategoryTypes type : org.homeunix.thecave.buddi.i18n.keys.BudgetCategoryTypes
+				.values()) {
+			types.add(ModelFactory.getBudgetCategoryType(type));
+		}
+		return types;
+	}
+
+	@Override
+	public void dispose() {
+		document.removeDocumentChangeListener(documentListener);
+	}
 }

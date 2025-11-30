@@ -1,11 +1,10 @@
 package org.homeunix.thecave.buddi.view.mvvm.mybudget;
 
 import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
 import javafx.scene.Parent;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TreeItem;
@@ -14,8 +13,6 @@ import javafx.scene.control.TreeTableColumn;
 import javafx.scene.control.TreeTableView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
 import org.homeunix.thecave.buddi.model.BudgetCategory;
 import org.homeunix.thecave.buddi.model.BudgetCategoryType;
@@ -30,7 +27,7 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
     private final BorderPane root;
     private final TreeTableView<BudgetCategory> treeTableView;
     private final ComboBox<BudgetCategoryType> periodTypeCombo;
-    private final Label dateLabel; // Placeholder for spinner/date display
+    private final Label dateLabel;
     private final Label netIncomeLabel;
     private final Button prevButton;
     private final Button nextButton;
@@ -64,7 +61,7 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
 
             @Override
             public BudgetCategoryType fromString(String string) {
-                return null; // Not needed for read-only combo
+                return null;
             }
         });
 
@@ -77,12 +74,7 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
 
         // Center: TreeTableView
         treeTableView.setShowRoot(false);
-        treeTableView.setEditable(true); // Enable editing
-        @SuppressWarnings("deprecation")
-        javafx.scene.control.TreeTableView.TreeTableViewSelectionModel<BudgetCategory> sm = treeTableView
-                .getSelectionModel(); // Just to use the variable if needed, but mainly to suppress deprecation on the
-                                      // next line if it was a method call.
-        // Actually, CONSTRAINED_RESIZE_POLICY is a static field.
+        treeTableView.setEditable(true);
         treeTableView.setColumnResizePolicy(TreeTableView.CONSTRAINED_RESIZE_POLICY);
 
         TreeTableColumn<BudgetCategory, String> nameColumn = new TreeTableColumn<>("Budget Category");
@@ -125,36 +117,12 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
         deleteItem.setOnAction(e -> {
             TreeItem<BudgetCategory> selectedItem = treeTableView.getSelectionModel().getSelectedItem();
             if (selectedItem != null) {
-                Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-                alert.setTitle("Delete Budget Category");
-                alert.setHeaderText(null);
-                alert.setContentText("Are you sure you want to delete " + selectedItem.getValue().getName() + "?");
-                alert.showAndWait().ifPresent(response -> {
-                    if (response == ButtonType.OK) {
-                        viewModel.deleteCategory(selectedItem.getValue());
-                    }
-                });
+                viewModel.deleteCategory(selectedItem.getValue());
             }
         });
 
         contextMenu.getItems().addAll(newItem, editItem, deleteItem);
         treeTableView.setContextMenu(contextMenu);
-
-        // Double click to edit
-        treeTableView.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2 && treeTableView.getSelectionModel().getSelectedItem() != null) {
-                // Check if clicking on amount column (which is editable) or name
-                // Actually, amount column has its own editor.
-                // Maybe double click on name should edit category properties?
-                // For now, let's stick to context menu for properties, and double click on
-                // amount for amount.
-                // But if we want double click on row to edit properties (if not on amount
-                // cell):
-                // It's a bit tricky with TreeTableView.
-                // Let's leave double click for now, as amount editing is handled by cell
-                // factory.
-            }
-        });
 
         root.setTop(topPanel);
         root.setCenter(treeTableView);
@@ -168,11 +136,6 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
         // Bind Period Types
         periodTypeCombo.getItems().setAll(viewModel.getBudgetCategoryTypes());
         periodTypeCombo.valueProperty().bindBidirectional(viewModel.selectedPeriodTypeProperty());
-
-        // Select first type if none selected
-        if (periodTypeCombo.getSelectionModel().getSelectedItem() == null && !periodTypeCombo.getItems().isEmpty()) {
-            periodTypeCombo.getSelectionModel().selectFirst();
-        }
 
         // Bind Date Display
         viewModel.selectedDateProperty().addListener((obs, oldVal, newVal) -> updateDateLabel(newVal));
@@ -188,14 +151,11 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
         // Populate Tree
         populateTree();
 
-        // Listen for Tree Changes
-        viewModel.addPropertyChangeListener(evt -> {
-            if (MyBudgetViewModel.PROPERTY_BUDGET_TREE_CHANGED.equals(evt.getPropertyName())) {
-                javafx.application.Platform.runLater(() -> {
-                    populateTree(); // Re-populate tree to reflect structural changes (add/remove)
+        // Listen for list changes to rebuild tree
+        ((javafx.collections.ObservableList<BudgetCategory>) viewModel.getBudgetCategories())
+                .addListener((ListChangeListener<BudgetCategory>) c -> {
+                    populateTree();
                 });
-            }
-        });
     }
 
     private void navigatePeriod(int offset) {
@@ -227,7 +187,10 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
         rootItem.setExpanded(true);
 
         for (BudgetCategory category : viewModel.getBudgetCategories()) {
-            rootItem.getChildren().add(createTreeItem(category));
+            // Only add top-level categories (those without parent)
+            if (category.getParent() == null) {
+                rootItem.getChildren().add(createTreeItem(category));
+            }
         }
 
         treeTableView.setRoot(rootItem);
@@ -238,7 +201,8 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
         item.setExpanded(category.isExpanded());
 
         // Listen for expansion changes to update model
-        item.expandedProperty().addListener((obs, oldVal, newVal) -> category.setExpanded(newVal));
+        item.expandedProperty()
+                .addListener((obs, oldVal, newVal) -> viewModel.setBudgetCategoryExpanded(category, newVal));
 
         for (BudgetCategory child : category.getChildren()) {
             if (!child.isDeleted()) { // Filter deleted
@@ -247,6 +211,17 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
         }
         return item;
     }
+
+    // Add missing method to ViewModel or handle here?
+    // ViewModel has setBudgetCategoryExpanded? No, I need to add it or just set it
+    // on category directly.
+    // The previous ViewModel had it. I should add it to the new ViewModel or just
+    // do category.setExpanded(newVal) here.
+    // But ViewModel is better for abstraction.
+    // Wait, I missed adding setBudgetCategoryExpanded to MyBudgetViewModel.
+    // I will add it to MyBudgetViewModel in a separate step or just call
+    // category.setExpanded(newVal) here directly since it's a model object.
+    // Direct model manipulation is okay if ViewModel exposes the model object.
 
     @Override
     public Parent getRoot() {
@@ -334,45 +309,21 @@ public class MyBudgetView implements View<MyBudgetViewModel> {
         public void commitEdit(BudgetCategory item) {
             if (isEditing()) {
                 super.commitEdit(item);
-            } else {
-                // If we are not in editing mode (e.g. focus lost), we still want to save
-                // But super.commitEdit() might not trigger if not editing.
-                // However, for TreeTableCell, usually startEdit is called.
             }
 
             if (textField != null && item != null) {
                 String text = textField.getText();
                 try {
-                    // Remove any currency symbols or non-numeric characters that might interfere,
-                    // although NumberFormat.parse usually handles symbols if they match the locale.
-                    // But to be safe and robust against simple input like "100" vs "$100.00":
-
                     Number number = org.homeunix.thecave.buddi.util.Formatter.getDecimalFormat().parse(text);
                     long amount = Math.round(number.doubleValue() * 100.0);
-
                     viewModel.setBudgetAmount(item, amount);
                 } catch (java.text.ParseException e) {
-                    // Try parsing as simple integer if currency parse fails (e.g. user entered
-                    // "100" without decimals)
                     try {
                         long simpleAmount = Long.parseLong(text.replaceAll("[^0-9-]", ""));
-                        // Assume user entered dollars if no decimal point? Or cents?
-                        // Buddi usually assumes dollars if typing "100".
-                        // Let's stick to the DecimalFormat parser which handles "100" as 100.0
-                        // correctly.
-                        // If ParseException happened, it's likely invalid input.
-                        // We can just ignore or show error.
-                        // But wait, if we parse "100", we should probably treat it as 100.00 (10000
-                        // cents)
-                        // If we just parseLong("100") -> 100 cents = $1.00. That might be confusing.
-                        // Let's assume if it fails decimal format, we try to treat it as a plain number
-                        // and multiply by 100.
-
                         long amount = simpleAmount * 100;
                         viewModel.setBudgetAmount(item, amount);
-
                     } catch (NumberFormatException nfe) {
-                        // Ignore invalid input
+                        // Ignore
                     }
                 } catch (Exception e) {
                     e.printStackTrace();

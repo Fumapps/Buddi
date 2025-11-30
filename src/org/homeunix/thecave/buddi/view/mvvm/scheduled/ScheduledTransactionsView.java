@@ -78,17 +78,7 @@ public class ScheduledTransactionsView implements View<ScheduledTransactionsView
         editButton.setOnAction(e -> viewModel.editSelectedTransaction());
         editButton.disableProperty().bind(table.getSelectionModel().selectedItemProperty().isNull());
 
-        deleteButton.setOnAction(e -> {
-            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-            alert.setTitle("Delete Scheduled Transaction");
-            alert.setHeaderText(null);
-            alert.setContentText("Are you sure you want to delete this scheduled transaction?");
-            alert.showAndWait().ifPresent(response -> {
-                if (response == ButtonType.OK) {
-                    viewModel.deleteSelectedTransaction();
-                }
-            });
-        });
+        deleteButton.setOnAction(e -> viewModel.deleteSelectedTransaction());
         deleteButton.disableProperty().bind(table.getSelectionModel().selectedItemProperty().isNull());
 
         // Double click to edit

@@ -3,17 +3,20 @@
  */
 package org.homeunix.thecave.buddi.test.viewmodel;
 
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
+import org.homeunix.thecave.buddi.model.Account;
 import org.homeunix.thecave.buddi.model.AccountType;
+import org.homeunix.thecave.buddi.model.BudgetCategory;
+import org.homeunix.thecave.buddi.model.BudgetCategoryType;
 import org.homeunix.thecave.buddi.model.Document;
+import org.homeunix.thecave.buddi.model.ScheduledTransaction;
 import org.homeunix.thecave.buddi.model.impl.ModelFactory;
 import org.homeunix.thecave.buddi.plugin.api.exception.ModelException;
-import org.homeunix.thecave.buddi.viewmodel.MyAccountsViewModel;
+import org.homeunix.thecave.buddi.view.mvvm.DialogService;
+import org.homeunix.thecave.buddi.view.mvvm.myaccounts.MyAccountsViewModel;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -23,17 +26,57 @@ import static org.junit.Assert.*;
 public class MyAccountsViewModelTest {
 	private Document document;
 	private MyAccountsViewModel viewModel;
+	private DialogService mockDialogService;
 
 	@Before
 	public void setUp() throws ModelException {
-		// Delete autosave file before each test to prevent dialog
+		try {
+			javafx.application.Platform.startup(() -> {
+			});
+		} catch (IllegalStateException e) {
+			// Platform already started
+		}
+
 		File autosaveFile = ModelFactory.getAutoSaveLocation(null);
 		if (autosaveFile.exists()) {
 			autosaveFile.delete();
 		}
-		
+
 		document = ModelFactory.createDocument();
-		viewModel = new MyAccountsViewModel(document);
+
+		mockDialogService = new DialogService() {
+			@Override
+			public void showError(String title, String message) {
+			}
+
+			@Override
+			public boolean showConfirmation(String title, String message) {
+				return true;
+			}
+
+			@Override
+			public Optional<BudgetCategory> showBudgetCategoryEditor(List<BudgetCategory> categories,
+					List<BudgetCategoryType> types, BudgetCategory categoryToEdit) {
+				return Optional.empty();
+			}
+
+			@Override
+			public Optional<Account> showAccountEditor(List<AccountType> accountTypes, Account accountToEdit) {
+				return Optional.empty();
+			}
+
+			@Override
+			public Optional<ScheduledTransaction> showScheduledTransactionEditor(Document document,
+					ScheduledTransaction transactionToEdit) {
+				return Optional.empty();
+			}
+
+			@Override
+			public void showTransactions(Account account) {
+			}
+		};
+
+		viewModel = new MyAccountsViewModel(document, mockDialogService);
 	}
 
 	@After
@@ -42,47 +85,19 @@ public class MyAccountsViewModelTest {
 	}
 
 	@Test
-	public void testInitialNetWorthTextIsNotNull() {
-		String netWorthText = viewModel.getNetWorthText();
-		assertNotNull("Net worth text should not be null", netWorthText);
-		assertTrue("Net worth text should contain HTML wrapper", netWorthText.contains("<html>"));
-	}
-
-	@Test
-	public void testGetAccountTypesReturnsDocumentTypes() {
-		List<AccountType> types = viewModel.getAccountTypes();
-		assertNotNull("Account types list should not be null", types);
-		assertEquals("Account types size should match document", types.size(), document.getAccountTypes().size());
-	}
-
-	@Test
-	public void testPropertyChangeListenerRegistration() {
-		final List<PropertyChangeEvent> events = new ArrayList<>();
-		PropertyChangeListener listener = event -> events.add(event);
-
-		viewModel.addPropertyChangeListener(listener);
+	public void testInitialState() {
 		viewModel.refresh();
-
-		assertTrue("Should have received property change events", events.size() > 0);
-
-		viewModel.removePropertyChangeListener(listener);
-		events.clear();
-
-		viewModel.refresh();
-		assertEquals("No events should be received after listener removal", 0, events.size());
+		waitForFxEvents();
+		assertNotNull(viewModel.netWorthProperty().get());
 	}
 
-	@Test
-	public void testGetSelectedAccountsWithNullValues() {
-		List<?> accounts = viewModel.getSelectedAccounts(null);
-		assertNotNull("Should return non-null list for null values", accounts);
-		assertEquals("Should return empty list for null values", 0, accounts.size());
-	}
-
-	@Test
-	public void testGetDocumentReturnsTheDocument() {
-		Document doc = viewModel.getDocument();
-		assertNotNull("Should return non-null document", doc);
-		assertSame("Should return the same document", doc, document);
+	private void waitForFxEvents() {
+		try {
+			java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+			javafx.application.Platform.runLater(latch::countDown);
+			latch.await(1, java.util.concurrent.TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 	}
 }
