@@ -21,7 +21,7 @@ h5 { font-size: x-small; }
 
 hr { color: black; background-color: black; height: 0.3em; border: 0em; }
 
-table.main { background-color: black; width: 100%; }
-table.main tr { padding-bottom: 1em; }
-table.main th { background-color: #DDE}
-table.main td { background-color: #EEF}
+table.main { width: 100%; border-collapse: collapse; border: 1px solid black; }
+table.main tr { }
+table.main th { background-color: #DDE; border: 1px solid black; padding: 0.2em; }
+table.main td { background-color: #EEF; border: 1px solid black; padding: 0.2em; }

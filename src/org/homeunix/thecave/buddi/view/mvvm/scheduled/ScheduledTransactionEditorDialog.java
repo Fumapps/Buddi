@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 public class ScheduledTransactionEditorDialog extends Dialog<ScheduledTransaction> {
 
     private final TextField nameField;
-    private final ComboBox<String> frequencyCombo;
+    private final ComboBox<ScheduleFrequency> frequencyCombo;
     private final DatePicker startDatePicker;
     private final TextField descriptionField;
     private final TextField amountField;
@@ -45,9 +45,7 @@ public class ScheduledTransactionEditorDialog extends Dialog<ScheduledTransactio
         // Fields
         nameField = new TextField();
         frequencyCombo = new ComboBox<>();
-        for (ScheduleFrequency sf : ScheduleFrequency.values()) {
-            frequencyCombo.getItems().add(sf.toString());
-        }
+        frequencyCombo.getItems().addAll(ScheduleFrequency.values());
 
         startDatePicker = new DatePicker(LocalDate.now());
         descriptionField = new TextField();
@@ -82,6 +80,18 @@ public class ScheduledTransactionEditorDialog extends Dialog<ScheduledTransactio
         fromCombo.setConverter(sourceConverter);
         toCombo.setConverter(sourceConverter);
 
+        frequencyCombo.setConverter(new StringConverter<ScheduleFrequency>() {
+            @Override
+            public String toString(ScheduleFrequency object) {
+                return object != null ? TextFormatter.getTranslation(object.toString()) : "";
+            }
+
+            @Override
+            public ScheduleFrequency fromString(String string) {
+                return null;
+            }
+        });
+
         // Layout
         GridPane grid = new GridPane();
         grid.setHgap(10);
@@ -113,7 +123,13 @@ public class ScheduledTransactionEditorDialog extends Dialog<ScheduledTransactio
         // Populate if editing
         if (transaction != null) {
             nameField.setText(transaction.getScheduleName());
-            frequencyCombo.setValue(transaction.getFrequencyType());
+            try {
+                frequencyCombo.setValue(ScheduleFrequency.valueOf(transaction.getFrequencyType()));
+            } catch (IllegalArgumentException e) {
+                // Handle case where stored frequency string might not match enum (shouldn't
+                // happen in normal usage)
+                frequencyCombo.getSelectionModel().selectFirst();
+            }
             startDatePicker
                     .setValue(transaction.getStartDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
             descriptionField.setText(transaction.getDescription());
@@ -153,7 +169,7 @@ public class ScheduledTransactionEditorDialog extends Dialog<ScheduledTransactio
     private ScheduledTransaction createOrUpdateTransaction() {
         try {
             String name = nameField.getText();
-            String frequency = frequencyCombo.getValue();
+            String frequency = frequencyCombo.getValue().toString();
             Date startDate = Date.from(startDatePicker.getValue().atStartOfDay(ZoneId.systemDefault()).toInstant());
             String desc = descriptionField.getText();
             long amount = parseAmount(amountField.getText());

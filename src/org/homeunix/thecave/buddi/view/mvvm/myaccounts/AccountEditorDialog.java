@@ -65,7 +65,7 @@ public class AccountEditorDialog extends Dialog<Account> {
         typeCombo.setConverter(new StringConverter<AccountType>() {
             @Override
             public String toString(AccountType object) {
-                return object != null ? object.getName() : "";
+                return object != null ? TextFormatter.getTranslation(object.getName()) : "";
             }
 
             @Override
